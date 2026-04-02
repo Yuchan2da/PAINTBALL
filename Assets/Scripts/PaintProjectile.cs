@@ -1,39 +1,79 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody))] // 이 스크립트를 붙이면 자동으로 Rigidbody 추가
+/// <summary>
+/// 물리 기반 페인트 총알.
+/// 
+/// [왜 Start() 대신 OnEnable()인가?]
+/// 풀링에서는 오브젝트가 파괴되지 않고 껐다 켜진다.
+/// Start()는 최초 1회만 호출되지만, OnEnable()은 SetActive(true)될 때마다 호출되므로
+/// 매 발사마다 속도 초기화와 수명 타이머를 리셋할 수 있다.
+/// </summary>
+[RequireComponent(typeof(Rigidbody))]
 public class PaintProjectile : MonoBehaviour
 {
-    // 맵 밖으로 영원히 날아가는 것을 방지하는 수명
+    [Tooltip("충돌 없이 날아갈 수 있는 최대 시간(초)")]
     public float lifeTime = 5f;
 
-    void Start()
+    private float timer;
+    private Rigidbody rb;
+
+    void Awake()
     {
-        // 생성된 시점(총알 발사 직후)으로부터 5초 뒤에 스스로를 파괴시킵니다.
-        Destroy(gameObject, lifeTime);
+        rb = GetComponent<Rigidbody>();
+    }
+
+    void OnEnable()
+    {
+        // 풀에서 꺼내질 때마다 이전 발사의 잔여 물리력을 깨끗이 제거
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        timer = lifeTime;
+    }
+
+    void Update()
+    {
+        // 수명 카운트다운 — 아무것도 못 맞추고 날아간 총알 회수용
+        timer -= Time.deltaTime;
+        if (timer <= 0f)
+        {
+            ReturnToPool();
+        }
     }
 
     void OnCollisionEnter(Collision collision)
     {
-        // 총알이 날아가다 어떤 물체 물리엔진에 '부딪혔을 때' 1번 실행
-        
-        // 1. 그 물체가 '바닥(Floor 레이어)'인가?
+        // 바닥(Floor 레이어)에 닿았을 때
         if (collision.gameObject.layer == LayerMask.NameToLayer("Floor"))
         {
-            // 이 위치에 페인트 자국을 남긴다~ 라는 주석을 개발일지에 적기 좋음!
-            Destroy(gameObject); // 부딪혔으니 이 총알은 삭제
+            // TODO: 페인트 데칼 생성 (다음 마일스톤)
+            ReturnToPool();
+            return;
         }
-        // 2. 그 물체가 '마네킹/적'의 몸통이나 머리인가?
-        else if (collision.gameObject.CompareTag("Body") || collision.gameObject.CompareTag("Head"))
+
+        // 적의 몸통이나 머리에 닿았을 때
+        if (collision.gameObject.CompareTag("Body") || collision.gameObject.CompareTag("Head"))
         {
-            // 맞췄을 때 로그 띄우기 (추후 데미지/체력 감소 체계 연결)
-            Debug.Log($"명중! 부위: {collision.gameObject.tag}");
-            
-            Destroy(gameObject); // 명중했으므로 총알 삭제
+            int damage = collision.gameObject.CompareTag("Head") ? 20 : 10;
+            Debug.Log($"명중! 부위: {collision.gameObject.tag} / 데미지: {damage}");
+            ReturnToPool();
+            return;
         }
+
+        // 그 외 벽 등에 닿아도 회수
+        ReturnToPool();
+    }
+
+    /// <summary>
+    /// Destroy 대신 풀로 반환한다.
+    /// [왜 메서드를 분리했는가?]
+    /// 회수 로직이 한 곳에 모여 있으면, 나중에 회수 시 이펙트(파티클 등)를
+    /// 추가하더라도 이 메서드 하나만 수정하면 된다. (단일 책임 원칙)
+    /// </summary>
+    void ReturnToPool()
+    {
+        if (ObjectPoolManager.Instance != null)
+            ObjectPoolManager.Instance.Return(gameObject);
         else
-        {
-            // 기타 다른 벽(레이어 지정 안 한 곳)에 닿아도 일단 총알 삭제
-            Destroy(gameObject);
-        }
+            gameObject.SetActive(false);
     }
 }
