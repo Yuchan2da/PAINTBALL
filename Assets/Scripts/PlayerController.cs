@@ -1,5 +1,13 @@
 using UnityEngine;
 
+/// <summary>
+/// 1인칭 플레이어 이동 + 시점 회전 + Animator 연동.
+///
+/// [Animator 연동 설계 원칙]
+/// - animator 필드가 null이면 모든 애니메이션 코드를 조용히 건너뜀.
+///   → 지금처럼 캐릭터 모델 없이 캡슐로 테스트할 때도 에러 없이 동작.
+///   → 나중에 PSPSPS Monkey 에셋을 붙이면 인스펙터에 드래그만 하면 끝.
+/// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
@@ -10,22 +18,29 @@ public class PlayerController : MonoBehaviour
     public float gravity = -9.81f;
 
     [Header("시점 설정")]
-    public Transform cameraTransform; // 메인 카메라 할당
+    public Transform cameraTransform;
     public float mouseSensitivity = 2f;
-    public float upLimit = -80f; // 고개 올리는 최대 각도
-    public float downLimit = 80f; // 고개 내리는 최대 각도
+    public float upLimit = -80f;
+    public float downLimit = 80f;
+
+    [Header("Animator 연동")]
+    [Tooltip("PSPSPS Monkey 에셋 등 캐릭터의 Animator 컴포넌트를 드래그. 없으면 비워둬도 됨.")]
+    public Animator animator;
+
+    // Animator 파라미터 이름을 상수로 관리
+    // [왜 상수인가?] 오타로 동작 안하는 버그를 사전에 막고,
+    // 나중에 파라미터 이름이 바뀌어도 이 한 줄만 수정하면 된다.
+    private static readonly int ParamSpeed      = Animator.StringToHash("Speed");
+    private static readonly int ParamIsGrounded = Animator.StringToHash("isGrounded");
+    private static readonly int ParamJump       = Animator.StringToHash("Jump");
 
     private CharacterController characterController;
     private Vector3 velocity;
-    
-    // 마우스 상하(고개) 회전값 누적용
     private float xRotation = 0f;
 
     void Start()
     {
         characterController = GetComponent<CharacterController>();
-        
-        // 화면 안에서 마우스 커서를 숨기고 고정시킵니다.
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -40,45 +55,70 @@ public class PlayerController : MonoBehaviour
     {
         if (cameraTransform == null) return;
 
-        // 마우스 입력값 받아오기
         float mouseX = Input.GetAxisRaw("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxisRaw("Mouse Y") * mouseSensitivity;
 
-        // 상하 시점 회전 (카메라 회전)
         xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, upLimit, downLimit); // 각도 제한
+        xRotation = Mathf.Clamp(xRotation, upLimit, downLimit);
         cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
-        // 좌우 시점 회전 (플레이어 몸통 전체 회전)
         transform.Rotate(Vector3.up * mouseX);
     }
 
     void HandleMovement()
     {
-        // 바닥에 닿아있으면 중력(수직 속도) 가속을 멈춤
-        if (characterController.isGrounded && velocity.y < 0)
+        bool isGrounded = characterController.isGrounded;
+
+        if (isGrounded && velocity.y < 0)
         {
-            velocity.y = -2f; 
+            velocity.y = -2f;
         }
 
-        float x = Input.GetAxis("Horizontal"); // A, D 키
-        float z = Input.GetAxis("Vertical");   // W, S 키
+        float x = Input.GetAxis("Horizontal");
+        float z = Input.GetAxis("Vertical");
+        bool isRunning = Input.GetKey(KeyCode.LeftShift);
+        float currentSpeed = isRunning ? runSpeed : walkSpeed;
 
-        // Shift를 누르고 있으면 달리기 속도 적용
-        float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? runSpeed : walkSpeed;
-
-        // 로컬 방향 벡터를 기준으로 이동
         Vector3 move = transform.right * x + transform.forward * z;
         characterController.Move(move * currentSpeed * Time.deltaTime);
 
-        // 스페이스바를 누르면(땅에 있을 때) 점프
-        if (Input.GetButtonDown("Jump") && characterController.isGrounded)
+        // 점프
+        if (Input.GetButtonDown("Jump") && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
+            UpdateAnimatorTrigger(ParamJump); // Jump 트리거 발동
         }
 
-        // 중력 적용
         velocity.y += gravity * Time.deltaTime;
         characterController.Move(velocity * Time.deltaTime);
+
+        // Animator 업데이트 (move.magnitude = 실제 이동 입력 크기 0~1)
+        // 달리면 1.0, 걸으면 0.5, 가만히 있으면 0으로 블렌드 트리와 연동
+        float speedValue = move.magnitude > 0.1f ? (isRunning ? 1f : 0.5f) : 0f;
+        UpdateAnimatorFloat(ParamSpeed, speedValue);
+        UpdateAnimatorBool(ParamIsGrounded, isGrounded);
+    }
+
+    // ── Animator 헬퍼 메서드 ─────────────────────────────────────
+    // [왜 헬퍼 메서드를 쓰는가?]
+    // 모든 Animator 호출마다 null 체크를 반복하지 않아도 됨. (DRY 원칙)
+
+    void UpdateAnimatorFloat(int paramHash, float value)
+    {
+        if (animator == null) return;
+        // 0.1f = 댐핑값. 값이 즉시 바뀌지 않고 부드럽게 전환됨 (발걸음 애니 끊김 방지)
+        animator.SetFloat(paramHash, value, 0.1f, Time.deltaTime);
+    }
+
+    void UpdateAnimatorBool(int paramHash, bool value)
+    {
+        if (animator == null) return;
+        animator.SetBool(paramHash, value);
+    }
+
+    void UpdateAnimatorTrigger(int paramHash)
+    {
+        if (animator == null) return;
+        animator.SetTrigger(paramHash);
     }
 }
