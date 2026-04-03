@@ -2,36 +2,32 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 총알 오브젝트 풀링 매니저 (싱글톤)
-/// 
-/// [왜 풀링을 쓰는가?]
-/// Instantiate/Destroy는 호출할 때마다 메모리 할당/해제가 발생해서
-/// 연사가 잦은 FPS 게임에서는 프레임 드랍(GC Spike)의 주범이 된다.
-/// 미리 만들어 두고 껐다/켰다 재활용하면 이 문제를 완전히 피할 수 있다.
-/// 
-/// [왜 싱글톤인가?]
-/// 풀 매니저는 씬에 딱 1개만 존재하면 되고,
-/// 어디서든 ObjectPoolManager.Instance로 접근할 수 있어야 편하다.
+/// 오브젝트 풀링 매니저 (싱글톤).
+/// 총알(Projectile)과 페인트 데칼(Decal) 두 종류의 풀을 관리한다.
+///
+/// [왜 한 매니저에서 두 풀을 관리하는가?]
+/// 풀마다 싱글톤 매니저를 만들면 코드가 중복되고 씬에 매니저가 난립한다.
+/// 풀 종류가 2~3개 수준이면 하나의 매니저에서 관리하는 게 실용적이다.
+/// (만약 10개 이상으로 늘어나면 그때 제네릭 풀로 리팩터링해도 늦지 않다)
 /// </summary>
 public class ObjectPoolManager : MonoBehaviour
 {
     public static ObjectPoolManager Instance { get; private set; }
 
-    [Header("풀 설정")]
-    [Tooltip("풀링할 총알 프리팹")]
-    public GameObject projectilePrefab;  
-    
-    [Tooltip("시작 시 미리 만들어 둘 총알 개수")]
-    public int poolSize = 100;
+    [Header("총알 풀")]
+    public GameObject projectilePrefab;
+    public int projectilePoolSize = 100;
 
-    // [왜 Queue인가?]
-    // 선입선출(FIFO) 구조라서 가장 오래 쉬고 있던 총알부터 꺼내 쓰게 된다.
-    // 골고루 돌려쓰므로 특정 오브젝트만 혹사당하는 일이 없다.
-    private Queue<GameObject> pool = new Queue<GameObject>();
+    [Header("데칼 풀")]
+    public GameObject decalPrefab;
+    public int decalPoolSize = 150;
+
+    // 풀별 Queue 분리 — 서로 다른 프리팹이 섞이는 사고 방지
+    private Queue<GameObject> projectilePool = new Queue<GameObject>();
+    private Queue<GameObject> decalPool = new Queue<GameObject>();
 
     void Awake()
     {
-        // 싱글톤 세팅: 이미 있으면 중복 제거
         if (Instance != null)
         {
             Destroy(gameObject);
@@ -39,28 +35,61 @@ public class ObjectPoolManager : MonoBehaviour
         }
         Instance = this;
 
-        FillPool();
+        FillPool(projectilePrefab, projectilePool, projectilePoolSize, "Projectiles");
+        FillPool(decalPrefab, decalPool, decalPoolSize, "Decals");
     }
 
     /// <summary>
-    /// 게임 시작 시 총알을 poolSize개만큼 미리 생성해 비활성 상태로 보관한다.
+    /// 지정된 프리팹을 poolSize개만큼 미리 생성해 비활성 상태로 보관한다.
+    /// [왜 containerName으로 자식 오브젝트를 묶는가?]
+    /// Hierarchy 창에서 총알 100개, 데칼 150개가 뒤섞이면 디버깅이 불가능해진다.
     /// </summary>
-    void FillPool()
+    void FillPool(GameObject prefab, Queue<GameObject> pool, int size, string containerName)
     {
-        for (int i = 0; i < poolSize; i++)
+        if (prefab == null) return;
+
+        // Hierarchy 정리용 부모 오브젝트 생성
+        Transform container = new GameObject(containerName).transform;
+        container.SetParent(transform);
+
+        for (int i = 0; i < size; i++)
         {
-            GameObject obj = Instantiate(projectilePrefab, transform);
+            GameObject obj = Instantiate(prefab, container);
             obj.SetActive(false);
             pool.Enqueue(obj);
         }
     }
 
-    /// <summary>
-    /// 풀에서 총알 1개를 꺼내 활성화한 뒤 돌려준다.
-    /// </summary>
-    public GameObject Get()
+    // ── 총알 풀 접근 ──────────────────────────────────────────────
+
+    public GameObject GetProjectile()
     {
-        // 풀에 여유분이 있으면 꺼내 쓴다
+        return GetFromPool(projectilePool, projectilePrefab);
+    }
+
+    public void ReturnProjectile(GameObject obj)
+    {
+        ReturnToPool(obj, projectilePool);
+    }
+
+    // ── 데칼 풀 접근 ──────────────────────────────────────────────
+
+    public GameObject GetDecal()
+    {
+        return GetFromPool(decalPool, decalPrefab);
+    }
+
+    public void ReturnDecal(GameObject obj)
+    {
+        ReturnToPool(obj, decalPool);
+    }
+
+    // ── 공통 로직 ─────────────────────────────────────────────────
+    // [왜 공통 메서드로 분리?] Get/Return 로직이 풀마다 동일하므로
+    // 중복 코드를 제거한다. (DRY 원칙)
+
+    GameObject GetFromPool(Queue<GameObject> pool, GameObject prefab)
+    {
         if (pool.Count > 0)
         {
             GameObject obj = pool.Dequeue();
@@ -68,20 +97,15 @@ public class ObjectPoolManager : MonoBehaviour
             return obj;
         }
 
-        // 풀이 바닥났으면 1개 추가 생성 (안전장치)
-        Debug.LogWarning("풀 %.소진! 총알을 추가 생성합니다.");
-        GameObject extra = Instantiate(projectilePrefab, transform);
+        Debug.LogWarning($"풀 소진! {prefab.name}을(를) 추가 생성합니다.");
+        GameObject extra = Instantiate(prefab, transform);
         extra.SetActive(true);
         return extra;
     }
 
-    /// <summary>
-    /// 사용이 끝난 총알을 비활성화하고 다시 풀에 넣는다.
-    /// </summary>
-    public void Return(GameObject obj)
+    void ReturnToPool(GameObject obj, Queue<GameObject> pool)
     {
         obj.SetActive(false);
-        obj.transform.SetParent(transform);
         pool.Enqueue(obj);
     }
 }
