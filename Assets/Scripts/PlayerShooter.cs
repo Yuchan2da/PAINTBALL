@@ -52,7 +52,7 @@ public class PlayerShooter : MonoBehaviour
         lastFireTime = Time.time;
         currentAmmo--;
 
-        GameObject bullet = ObjectPoolManager.Instance.Get();
+        GameObject bullet = ObjectPoolManager.Instance.GetProjectile();
         bullet.transform.position = firePoint.position;
         bullet.transform.rotation = Quaternion.LookRotation(playerCamera.transform.forward);
 
