@@ -1,12 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// 1인칭 플레이어 이동 + 시점 회전 + Animator 연동.
+/// 1인칭 플레이어 이동 + 시점 회전 + Animator 연동 + 정지 패널티.
 ///
-/// [Animator 연동 설계 원칙]
-/// - animator 필드가 null이면 모든 애니메이션 코드를 조용히 건너뜀.
-///   → 지금처럼 캐릭터 모델 없이 캡슐로 테스트할 때도 에러 없이 동작.
-///   → 나중에 PSPSPS Monkey 에셋을 붙이면 인스펙터에 드래그만 하면 끝.
+/// [설계 원칙]
+/// - 각 기능을 Handle___() 메서드로 분리하여 단일 책임 원칙(SRP) 준수.
+/// - animator가 null이면 애니메이션 코드를 조용히 건너뜀 (모델 없이도 동작).
+/// - 정지 패널티는 키보드 입력이 아닌 '실제 월드 좌표 이동량'으로 판정.
+///   → 제자리 점프, 벽에 붙어서 키만 누르기 등의 꼼수를 원천 차단.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -24,32 +25,49 @@ public class PlayerController : MonoBehaviour
     public float downLimit = 80f;
 
     [Header("Animator 연동")]
-    [Tooltip("PSPSPS Monkey 에셋 등 캐릭터의 Animator 컴포넌트를 드래그. 없으면 비워둬도 됨.")]
+    [Tooltip("캐릭터의 Animator 컴포넌트. 비워두면 애니메이션 없이 동작")]
     public Animator animator;
 
-    // Animator 파라미터 이름을 상수로 관리
-    // [왜 상수인가?] 오타로 동작 안하는 버그를 사전에 막고,
-    // 나중에 파라미터 이름이 바뀌어도 이 한 줄만 수정하면 된다.
-    private static readonly int ParamSpeed      = Animator.StringToHash("Speed");
-    private static readonly int ParamIsGrounded = Animator.StringToHash("isGrounded");
-    private static readonly int ParamJump       = Animator.StringToHash("Jump");
+    [Header("정지 패널티")]
+    [Tooltip("몇 초 동안 안 움직이면 패널티를 줄 것인지")]
+    public float penaltyInterval = 5f;
+    [Tooltip("이 거리(m) 이상 움직여야 '이동한 것'으로 인정")]
+    public float minMoveDistance = 1f;
 
+    // ── Animator 파라미터 해시 (상수) ──────────────────────────────
+    // [왜 StringToHash?] 매 프레임 문자열 비교 대신 정수 비교로 성능 확보 + 오타 방지
+    private static readonly int AnimSpeed      = Animator.StringToHash("Speed");
+    private static readonly int AnimIsGrounded = Animator.StringToHash("isGrounded");
+    private static readonly int AnimJump       = Animator.StringToHash("Jump");
+
+    // ── 내부 상태 ─────────────────────────────────────────────────
     private CharacterController characterController;
     private Vector3 velocity;
-    private float xRotation = 0f;
+    private float xRotation;
+
+    // 정지 패널티 추적용
+    private Vector3 penaltyCheckPosition;
+    private float penaltyTimer;
 
     void Start()
     {
         characterController = GetComponent<CharacterController>();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        // 패널티 기준점을 시작 위치로 초기화
+        penaltyCheckPosition = transform.position;
+        penaltyTimer = 0f;
     }
 
     void Update()
     {
         HandleLook();
         HandleMovement();
+        HandleIdlePenalty();
     }
+
+    // ── 시점 회전 ─────────────────────────────────────────────────
 
     void HandleLook()
     {
@@ -64,6 +82,8 @@ public class PlayerController : MonoBehaviour
 
         transform.Rotate(Vector3.up * mouseX);
     }
+
+    // ── 이동 / 점프 / 중력 ────────────────────────────────────────
 
     void HandleMovement()
     {
@@ -86,39 +106,63 @@ public class PlayerController : MonoBehaviour
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
-            UpdateAnimatorTrigger(ParamJump); // Jump 트리거 발동
+            SetAnimTrigger(AnimJump);
         }
 
+        // 중력
         velocity.y += gravity * Time.deltaTime;
         characterController.Move(velocity * Time.deltaTime);
 
-        // Animator 업데이트 (move.magnitude = 실제 이동 입력 크기 0~1)
-        // 달리면 1.0, 걸으면 0.5, 가만히 있으면 0으로 블렌드 트리와 연동
+        // Animator 업데이트
         float speedValue = move.magnitude > 0.1f ? (isRunning ? 1f : 0.5f) : 0f;
-        UpdateAnimatorFloat(ParamSpeed, speedValue);
-        UpdateAnimatorBool(ParamIsGrounded, isGrounded);
+        SetAnimFloat(AnimSpeed, speedValue);
+        SetAnimBool(AnimIsGrounded, isGrounded);
     }
 
-    // ── Animator 헬퍼 메서드 ─────────────────────────────────────
-    // [왜 헬퍼 메서드를 쓰는가?]
-    // 모든 Animator 호출마다 null 체크를 반복하지 않아도 됨. (DRY 원칙)
+    // ── 5초 정지 패널티 ───────────────────────────────────────────
+    // [판정 기준] 키보드 입력(Input.GetAxis)이 아닌 transform.position의 실제 변화량.
+    // → 벽에 붙어서 W키만 꾹 누르고 있어도 실제 좌표가 안 바뀌면 패널티 발동.
+    // → 제자리 점프만 반복해도 착지 위치가 같으면 패널티 발동.
 
-    void UpdateAnimatorFloat(int paramHash, float value)
+    void HandleIdlePenalty()
     {
-        if (animator == null) return;
-        // 0.1f = 댐핑값. 값이 즉시 바뀌지 않고 부드럽게 전환됨 (발걸음 애니 끊김 방지)
-        animator.SetFloat(paramHash, value, 0.1f, Time.deltaTime);
+        penaltyTimer += Time.deltaTime;
+
+        if (penaltyTimer < penaltyInterval) return;
+
+        // 5초가 지났으므로 이동 거리 판정
+        float distanceMoved = Vector3.Distance(transform.position, penaltyCheckPosition);
+
+        if (distanceMoved <= minMoveDistance)
+        {
+            // 패널티 발동!
+            Debug.Log($"[패널티] 5초간 이동 거리 {distanceMoved:F2}m — 정지 패널티 발동!");
+            // TODO: 추후 발밑에 페인트 누수 이펙트(데칼) 생성으로 교체 예정
+        }
+
+        // 판정 후 타이머와 기준 위치 리셋 (패널티 발동 여부와 무관하게 항상 리셋)
+        penaltyTimer = 0f;
+        penaltyCheckPosition = transform.position;
     }
 
-    void UpdateAnimatorBool(int paramHash, bool value)
+    // ── Animator 헬퍼 ─────────────────────────────────────────────
+    // [왜 헬퍼?] null 체크를 한 곳에서 처리 → DRY 원칙
+
+    void SetAnimFloat(int hash, float value)
     {
-        if (animator == null) return;
-        animator.SetBool(paramHash, value);
+        if (animator != null)
+            animator.SetFloat(hash, value, 0.1f, Time.deltaTime);
     }
 
-    void UpdateAnimatorTrigger(int paramHash)
+    void SetAnimBool(int hash, bool value)
     {
-        if (animator == null) return;
-        animator.SetTrigger(paramHash);
+        if (animator != null)
+            animator.SetBool(hash, value);
+    }
+
+    void SetAnimTrigger(int hash)
+    {
+        if (animator != null)
+            animator.SetTrigger(hash);
     }
 }
