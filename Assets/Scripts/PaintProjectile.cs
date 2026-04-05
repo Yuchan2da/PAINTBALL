@@ -14,6 +14,10 @@ public class PaintProjectile : MonoBehaviour
     [Tooltip("충돌 없이 날아갈 수 있는 최대 시간(초)")]
     public float lifeTime = 5f;
 
+    [Tooltip("이 총알의 팀 색상 (발사 시 PlayerShooter가 설정)")]
+    [HideInInspector]
+    public Color teamColor = Color.red;
+
     private float timer;
     private Rigidbody rb;
 
@@ -53,18 +57,21 @@ public class PaintProjectile : MonoBehaviour
         // 적의 몸통이나 머리에 닿았을 때
         if (collision.gameObject.CompareTag("Body") || collision.gameObject.CompareTag("Head"))
         {
-            // Head = 20 데미지, Body = 10 데미지 (기획서 2단 히트박스 규칙)
-            int damage = collision.gameObject.CompareTag("Head") ? 20 : 10;
+            ContactPoint contact = collision.GetContact(0);
 
-            // [왜 GetComponentInParent?]
-            // 콜라이더(Head/Body)는 자식 오브젝트에 있고,
-            // MonkeyHealth는 부모(최상위 적 오브젝트)에 붙어있으므로
-            // 부모 방향으로 올라가며 컴포넌트를 찾아야 한다.
+            // ── 데미지 처리 ──
+            int damage = collision.gameObject.CompareTag("Head") ? 20 : 10;
             MonkeyHealth health = collision.gameObject.GetComponentInParent<MonkeyHealth>();
             if (health != null)
-            {
                 health.TakeDamage(damage);
-            }
+
+            // ── 페인트 칠하기 ──
+            // [왜 GetComponentInParent?]
+            // PaintReceiver는 최상위 캐릭터 오브젝트에 있고,
+            // 충돌한 콜라이더(Head/Body)는 자식이므로 부모 방향으로 탐색.
+            PaintReceiver paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
+            if (paintReceiver != null)
+                paintReceiver.PaintAt(contact.point, contact.normal, teamColor);
 
             ReturnToPool();
             return;
