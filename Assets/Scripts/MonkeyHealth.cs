@@ -24,6 +24,16 @@ public class MonkeyHealth : MonoBehaviour
         CurrentHp = maxHp;
     }
 
+    // ── [테스트 전용] ─────────────────────────────────────────────
+    // 적 AI가 없는 프로토타입 단계에서 HP 감소를 확인하기 위한 임시 코드.
+    // 적 AI가 완성되면 이 Update() 전체를 삭제한다.
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.T)) TakeDamage(10); // Body 피격 시뮬레이션
+        if (Input.GetKeyDown(KeyCode.Y)) TakeDamage(20); // Head 피격 시뮬레이션
+    }
+    // ─────────────────────────────────────────────────────────────
+
     /// <summary>
     /// 외부에서 호출하는 유일한 데미지 진입점.
     /// </summary>

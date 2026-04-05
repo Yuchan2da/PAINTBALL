@@ -44,6 +44,7 @@ public class PlayerController : MonoBehaviour
     private CharacterController characterController;
     private Vector3 velocity;
     private float xRotation;
+    private bool isGrounded; // HandleMovement에서 매 프레임 갱신, 패널티에서 참조
 
     // 정지 패널티 추적용
     private Vector3 penaltyCheckPosition;
@@ -87,7 +88,7 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement()
     {
-        bool isGrounded = characterController.isGrounded;
+        isGrounded = characterController.isGrounded; // 필드 갱신 (패널티에서 참조)
 
         if (isGrounded && velocity.y < 0)
         {
@@ -135,14 +136,40 @@ public class PlayerController : MonoBehaviour
 
         if (distanceMoved <= minMoveDistance)
         {
-            // 패널티 발동!
             Debug.Log($"[패널티] 5초간 이동 거리 {distanceMoved:F2}m — 정지 패널티 발동!");
-            // TODO: 추후 발밑에 페인트 누수 이펙트(데칼) 생성으로 교체 예정
+            SpawnPenaltyDecal();
         }
 
         // 판정 후 타이머와 기준 위치 리셋 (패널티 발동 여부와 무관하게 항상 리셋)
         penaltyTimer = 0f;
         penaltyCheckPosition = transform.position;
+    }
+
+    /// <summary>
+    /// 패널티 발동 시 발밑에 페인트 데칼을 소환한다.
+    /// [왜 isGrounded 체크를 하는가?]
+    /// 공중에서 패널티가 발동되면 데칼이 허공에 생성되므로, 땅에 있을 때만 소환한다.
+    /// [왜 CharacterController로 발 위치를 계산하는가?]
+    /// transform.position은 캐릭터 중심점이므로, CharacterController의 height/center로
+    /// 정확한 발바닥 위치를 구해야 데칼이 발밑에 정확히 붙는다.
+    /// </summary>
+    void SpawnPenaltyDecal()
+    {
+        if (!isGrounded) return;
+        if (ObjectPoolManager.Instance == null) return;
+
+        // 발바닥 위치 계산: 중심 - (콜라이더 높이의 절반 + 중심 오프셋)
+        float halfHeight = characterController.height / 2f;
+        Vector3 footPosition = transform.position
+            + characterController.center
+            - new Vector3(0f, halfHeight - 0.02f, 0f);
+
+        GameObject decal = ObjectPoolManager.Instance.GetDecal();
+        if (decal == null) return; // 풀 소진 안전장치
+
+        decal.transform.position = footPosition;
+        // 바닥에 눕히기: Quad 앞면(-Z)이 위(+Y)를 향하도록
+        decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, Vector3.up);
     }
 
     // ── Animator 헬퍼 ─────────────────────────────────────────────
