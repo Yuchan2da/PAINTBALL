@@ -16,8 +16,8 @@ TagManager:
   - Floor
   - LocalPlayer
   - PaintMesh
-  - 
-  - 
+  - Projectile
+  - Hitbox
   - 
   - 
   - 

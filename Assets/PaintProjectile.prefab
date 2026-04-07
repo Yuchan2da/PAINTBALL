@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 4241496546799217059}
   - component: {fileID: 3101113217144607722}
   - component: {fileID: 4051511258919265491}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: PaintProjectile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -154,3 +154,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PaintProjectile
   lifeTime: 5
+  teamColor: {r: 1, g: 0, b: 0, a: 1}
+  ownerRoot: {fileID: 0}

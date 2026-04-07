@@ -2,11 +2,16 @@ using UnityEngine;
 
 /// <summary>
 /// 물리 기반 페인트 총알.
-/// 
-/// [왜 Start() 대신 OnEnable()인가?]
-/// 풀링에서는 오브젝트가 파괴되지 않고 껐다 켜진다.
-/// Start()는 최초 1회만 호출되지만, OnEnable()은 SetActive(true)될 때마다 호출되므로
-/// 매 발사마다 속도 초기화와 수명 타이머를 리셋할 수 있다.
+///
+/// [풀링 호환] Start() 대신 OnEnable()에서 상태를 리셋한다.
+/// Start()는 최초 1회만 호출되지만, OnEnable()은 SetActive(true)될 때마다
+/// 호출되므로 매 발사마다 속도와 수명 타이머를 리셋할 수 있다.
+///
+/// [레이어 구조]
+/// - 총알: Projectile 레이어 → Hitbox 레이어와만 충돌
+/// - 히트박스: Hitbox 레이어 → Projectile과만 충돌
+/// - CharacterController: Default → Projectile과 충돌하지 않음
+/// → 따라서 총알이 CC에 막히거나, CC가 총알을 밟는 문제가 원천 차단됨.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class PaintProjectile : MonoBehaviour
@@ -14,62 +19,69 @@ public class PaintProjectile : MonoBehaviour
     [Tooltip("충돌 없이 날아갈 수 있는 최대 시간(초)")]
     public float lifeTime = 5f;
 
-    [Tooltip("이 총알의 팀 색상 (발사 시 PlayerShooter가 설정)")]
-    [HideInInspector]
-    public Color teamColor = Color.red;
+    [HideInInspector] public Color teamColor = Color.red;
+    [HideInInspector] public Transform ownerRoot;
 
-    private float timer;
     private Rigidbody rb;
+    private float timer;
+
+    // ── 레이어 ID 캐싱 (StringToHash와 동일 원리 — 매 프레임 문자열 비교 방지) ──
+    private static int floorLayer  = -1;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
+        // 레이어 ID는 앱 수명 전체에서 동일하므로 최초 1회만 조회
+        if (floorLayer < 0)
+            floorLayer = LayerMask.NameToLayer("Floor");
+
+        // 풀에서 인스턴스가 생성될 때 Projectile 레이어 강제 적용
+        // [왜?] 프리팹 레이어를 바꿔도 이미 Instantiate된 풀 인스턴스에는
+        // 반영되지 않을 수 있으므로, 코드에서 확실히 보장한다.
+        int projLayer = LayerMask.NameToLayer("Projectile");
+        if (projLayer >= 0) gameObject.layer = projLayer;
     }
 
     void OnEnable()
     {
-        // 풀에서 꺼내질 때마다 이전 발사의 잔여 물리력을 깨끗이 제거
-        rb.linearVelocity = Vector3.zero;
+        rb.linearVelocity  = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         timer = lifeTime;
     }
 
     void Update()
     {
-        // 수명 카운트다운 — 아무것도 못 맞추고 날아간 총알 회수용
         timer -= Time.deltaTime;
-        if (timer <= 0f)
-        {
-            ReturnToPool();
-        }
+        if (timer <= 0f) ReturnToPool();
     }
 
     void OnCollisionEnter(Collision collision)
     {
-        // 바닥(Floor 레이어)에 닿았을 때 → 페인트 자국 남기기
-        if (collision.gameObject.layer == LayerMask.NameToLayer("Floor"))
+        // ── 자해 방지 ──────────────────────────────────────────
+        // Hitbox 레이어로 격리했기 때문에 대부분 방지되지만,
+        // 멀티플레이에서 같은 팀 히트박스와 충돌할 수 있으므로 이중 안전장치.
+        if (ownerRoot != null && collision.transform.root == ownerRoot)
+            return;
+
+        // ── 바닥 충돌 → 데칼 ────────────────────────────────────
+        if (collision.gameObject.layer == floorLayer)
         {
             SpawnDecal(collision);
             ReturnToPool();
             return;
         }
 
-        // 적의 몸통이나 머리에 닿았을 때
-        if (collision.gameObject.CompareTag("Body") || collision.gameObject.CompareTag("Head"))
+        // ── 히트박스 충돌 → 데미지 + 페인트 ─────────────────────
+        if (collision.gameObject.CompareTag("Head") || collision.gameObject.CompareTag("Body"))
         {
             ContactPoint contact = collision.GetContact(0);
 
-            // ── 데미지 처리 ──
             int damage = collision.gameObject.CompareTag("Head") ? 20 : 10;
-            MonkeyHealth health = collision.gameObject.GetComponentInParent<MonkeyHealth>();
-            if (health != null)
-                health.TakeDamage(damage);
+            var health = collision.gameObject.GetComponentInParent<MonkeyHealth>();
+            if (health != null) health.TakeDamage(damage);
 
-            // ── 페인트 칠하기 ──
-            // [왜 GetComponentInParent?]
-            // PaintReceiver는 최상위 캐릭터 오브젝트에 있고,
-            // 충돌한 콜라이더(Head/Body)는 자식이므로 부모 방향으로 탐색.
-            PaintReceiver paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
+            var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)
                 paintReceiver.PaintAt(contact.point, contact.normal, teamColor);
 
@@ -77,21 +89,12 @@ public class PaintProjectile : MonoBehaviour
             return;
         }
 
-        // 그 외 벽 등에 닿아도 회수
+        // ── 그 외 (벽 등) → 회수 ────────────────────────────────
         ReturnToPool();
     }
 
     /// <summary>
-    /// Destroy 대신 풀로 반환한다.
-    /// [왜 메서드를 분리했는가?]
-    /// 회수 로직이 한 곳에 모여 있으면, 나중에 회수 시 이펙트(파티클 등)를
-    /// 추가하더라도 이 메서드 하나만 수정하면 된다. (단일 책임 원칙)
-    /// </summary>
-    /// <summary>
-    /// 총알이 바닥에 맞은 지점에 페인트 데칼을 배치한다.
-    /// [왜 collision 데이터를 쓰는가?]
-    /// ContactPoint에서 정확한 충돌 위치와 표면 법선(normal)을 가져올 수 있어서,
-    /// 데칼이 바닥 표면에 딱 붙어서 눕도록 회전시킬 수 있다.
+    /// 바닥에 페인트 데칼을 배치한다.
     /// </summary>
     void SpawnDecal(Collision collision)
     {
@@ -100,16 +103,8 @@ public class PaintProjectile : MonoBehaviour
         ContactPoint contact = collision.GetContact(0);
         GameObject decal = ObjectPoolManager.Instance.GetDecal();
 
-        // 충돌 지점에 배치 (바닥에 살짝 띄워서 z-fighting 방지)
         decal.transform.position = contact.point + contact.normal * 0.01f;
-
-        // [회전 계산]
-        // Unity Quad의 앞면(보이는 면)은 로컬 -Z 방향을 향한다.
-        // 바닥에 눕히면서 앞면이 위를 향하게 하려면
-        // -Z → contact.normal 방향으로 회전시켜야 한다.
         decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, contact.normal);
-
-        Debug.Log($"[데칼] 위치: {decal.transform.position} / 법선: {contact.normal}");
     }
 
     void ReturnToPool()
