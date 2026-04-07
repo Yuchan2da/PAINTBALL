@@ -207,7 +207,21 @@ public class PaintReceiver : MonoBehaviour
         RenderTexture.ReleaseTemporary(temp);
     }
 
-    // ── 유틸리티 ──────────────────────────────────────────────────
+    // ── 테스트 / 유틸리티 ──────────────────────────────────────────
+
+    /// <summary>
+    /// [테스트 전용] 랜덤 UV 좌표에 직접 페인트를 칠한다.
+    /// [왜 별도 메서드?] SimulateEnemyHit처럼 실제 총알이 없는 상황에서는
+    /// 월드→UV 변환 Raycast가 빗나갈 수 있다.
+    /// UV에 직접 칠하면 페인트 렌더링 파이프라인만 정확히 테스트할 수 있다.
+    /// </summary>
+    public void PaintAtRandomUV(Color color)
+    {
+        if (stampMaterial == null || paintMap == null) return;
+
+        Vector2 randomUV = new Vector2(Random.Range(0.05f, 0.95f), Random.Range(0.05f, 0.95f));
+        DrawSplat(randomUV, color);
+    }
 
     void ClearPaintMap()
     {
