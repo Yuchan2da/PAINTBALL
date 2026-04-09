@@ -98,3 +98,7 @@ InitTestScene*.unity*
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 .cursorrules/.cursorrules.txt
+
+# MCP로 자동 저장되는 스크린샷
+/[Aa]ssets/Screenshots/
+/[Aa]ssets/Screenshots.meta
