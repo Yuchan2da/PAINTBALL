@@ -32,11 +32,12 @@ public class PaintReceiver : MonoBehaviour
     public float splatHardness = 0.6f;
 
     // ── 셰이더 프로퍼티 ID (StringToHash와 동일한 최적화) ──────────
-    private static readonly int PropPaintMap     = Shader.PropertyToID("_PaintMap");
-    private static readonly int PropSplatCenter  = Shader.PropertyToID("_SplatCenter");
-    private static readonly int PropSplatRadius  = Shader.PropertyToID("_SplatRadius");
-    private static readonly int PropSplatColor   = Shader.PropertyToID("_SplatColor");
+    private static readonly int PropPaintMap      = Shader.PropertyToID("_PaintMap");
+    private static readonly int PropSplatCenter   = Shader.PropertyToID("_SplatCenter");
+    private static readonly int PropSplatRadius   = Shader.PropertyToID("_SplatRadius");
+    private static readonly int PropSplatColor    = Shader.PropertyToID("_SplatColor");
     private static readonly int PropSplatHardness = Shader.PropertyToID("_SplatHardness");
+    private static readonly int PropRevealAmount  = Shader.PropertyToID("_RevealAmount");
 
     // ── 내부 상태 ─────────────────────────────────────────────────
     private RenderTexture paintMap;
@@ -223,12 +224,32 @@ public class PaintReceiver : MonoBehaviour
         DrawSplat(randomUV, color);
     }
 
-    void ClearPaintMap()
+    /// <summary>
+    /// 페인트맵을 완전히 투명하게 초기화하고, RevealAmount도 0으로 리셋한다.
+    /// 리스폰 시 MonkeyHealth에서 호출하여 깨끗한 상태로 부활.
+    /// </summary>
+    public void ClearPaintMap()
     {
         RenderTexture prev = RenderTexture.active;
         RenderTexture.active = paintMap;
         GL.Clear(true, true, Color.clear);
         RenderTexture.active = prev;
+
+        // 스텔스 복원 (투명화)
+        SetReveal(0f);
+    }
+
+    /// <summary>
+    /// 캐릭터의 정체 노출량을 제어한다.
+    /// 0 = 스텔스 (페인트만 보임), 1 = 전신 불투명 (사망 시 정체 노출)
+    /// [MaterialPropertyBlock으로 제어하는 이유]
+    /// 원본 머티리얼을 변경하지 않아서 캐릭터마다 독립적으로 작동.
+    /// </summary>
+    public void SetReveal(float amount)
+    {
+        if (targetRenderer == null || mpb == null) return;
+        mpb.SetFloat(PropRevealAmount, amount);
+        targetRenderer.SetPropertyBlock(mpb);
     }
 
     void OnDestroy()

@@ -40,11 +40,23 @@ public class PlayerController : MonoBehaviour
     private static readonly int AnimIsGrounded = Animator.StringToHash("isGrounded");
     private static readonly int AnimJump       = Animator.StringToHash("Jump");
 
+    // ── 외부 제어 (사망/리스폰) ────────────────────────────────────
+    /// <summary>
+    /// false로 설정하면 이동, 시점 회전, 점프가 모두 잠긴다.
+    /// MonkeyHealth에서 사망/부활 시 토글한다.
+    /// </summary>
+    [HideInInspector] public bool inputEnabled = true;
+
     // ── 내부 상태 ─────────────────────────────────────────────────
     private CharacterController characterController;
     private Vector3 velocity;
     private float xRotation;
-    private bool isGrounded; // HandleMovement에서 매 프레임 갱신, 패널티에서 참조
+    private bool _isGrounded; // HandleMovement에서 매 프레임 갱신
+
+    /// <summary>
+    /// 캐릭터가 바닥에 닿아있는지 여부. FootprintManager에서 참조.
+    /// </summary>
+    public bool IsGrounded => _isGrounded;
 
     // 정지 패널티 추적용
     private Vector3 penaltyCheckPosition;
@@ -63,6 +75,14 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (!inputEnabled)
+        {
+            // 사망 상태에서도 중력만 적용 (공중에서 죽으면 바닥으로 내려와야 함)
+            velocity.y += gravity * Time.deltaTime;
+            characterController.Move(velocity * Time.deltaTime);
+            return;
+        }
+
         HandleLook();
         HandleMovement();
         HandleIdlePenalty();
@@ -88,9 +108,9 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement()
     {
-        isGrounded = characterController.isGrounded; // 필드 갱신 (패널티에서 참조)
+        _isGrounded = characterController.isGrounded; // 필드 갱신
 
-        if (isGrounded && velocity.y < 0)
+        if (_isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
         }
@@ -104,7 +124,7 @@ public class PlayerController : MonoBehaviour
         characterController.Move(move * currentSpeed * Time.deltaTime);
 
         // 점프
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if (Input.GetButtonDown("Jump") && _isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
             SetAnimTrigger(AnimJump);
@@ -117,7 +137,7 @@ public class PlayerController : MonoBehaviour
         // Animator 업데이트
         float speedValue = move.magnitude > 0.1f ? (isRunning ? 1f : 0.5f) : 0f;
         SetAnimFloat(AnimSpeed, speedValue);
-        SetAnimBool(AnimIsGrounded, isGrounded);
+        SetAnimBool(AnimIsGrounded, _isGrounded);
     }
 
     // ── 5초 정지 패널티 ───────────────────────────────────────────
@@ -155,7 +175,7 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     void SpawnPenaltyDecal()
     {
-        if (!isGrounded) return;
+        if (!_isGrounded) return;
         if (ObjectPoolManager.Instance == null) return;
 
         // 발바닥 위치 계산: 중심 - (콜라이더 높이의 절반 + 중심 오프셋)

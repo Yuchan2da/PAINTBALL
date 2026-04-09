@@ -1,27 +1,93 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
-/// 원숭이(적/플레이어) 체력 관리 스크립트.
+/// 원숭이(적/플레이어) 체력 관리 + 사망 연출 + 리스폰 시스템.
+///
+/// [사망 흐름]
+/// 1. HP ≤ 0 → HandleDeath()
+/// 2. 조작 잠금 (PlayerController/PlayerShooter.inputEnabled = false)
+/// 3. 사망 애니메이션 트리거 ("Die") 재생
+/// 4. 카메라를 등 뒤 3인칭 숄더뷰로 전환 + LocalPlayer 레이어 컬링 켜기
+///    (벽 뚫림 방지: SphereCast로 벽 충돌 체크 후 카메라 위치 보정)
+/// 5. 3초 대기 (데스캠)
+/// 6. Respawn() → 랜덤 위치 텔레포트 + HP/페인트/애니메이션 완전 초기화
 ///
 /// [설계 원칙]
-/// - 이 스크립트는 최상위 캐릭터 오브젝트에 붙인다 (히트박스 콜라이더가 아닌 부모).
-/// - 히트박스(Head/Body)는 자식 오브젝트에 콜라이더+태그로만 존재하고,
-///   데미지 처리는 부모의 이 스크립트가 일괄 담당한다. (단일 책임 원칙)
-/// - 추후 Photon 적용 시 TakeDamage를 RPC로 교체하기만 하면 됨.
+/// - 이 스크립트가 사망~부활의 전체 흐름을 오케스트레이션한다.
+/// - PlayerController/Shooter는 inputEnabled만 읽고, 자신의 역할만 수행.
+/// - 추후 Photon 적용 시 TakeDamage/Respawn을 RPC로 교체하면 됨.
 /// </summary>
 public class MonkeyHealth : MonoBehaviour
 {
     [Header("체력 설정")]
     public int maxHp = 100;
 
-    // [왜 프로퍼티?] 외부에서 읽을 수는 있지만 수정은 TakeDamage()를 통해서만 가능.
-    // → 체력이 임의로 바뀌는 버그를 구조적으로 차단.
+    [Header("데스캠 설정")]
+    [Tooltip("사망 후 부활까지 대기 시간(초)")]
+    public float deathCamDuration = 3f;
+
+    [Tooltip("데스캠 카메라 오프셋 (캐릭터 로컬 좌표 기준, 등 뒤 위)")]
+    public Vector3 deathCamOffset = new Vector3(0f, 1.5f, -3f);
+
+    [Tooltip("카메라 벽 뚫림 방지 SphereCast 반지름")]
+    public float cameraCollisionRadius = 0.2f;
+
+    // ── 상태 ──────────────────────────────────────────────────────
     public int CurrentHp { get; private set; }
     public bool IsDead => CurrentHp <= 0;
+
+    // ── 캐시 ──────────────────────────────────────────────────────
+    private PlayerController playerController;
+    private PlayerShooter playerShooter;
+    private PaintReceiver paintReceiver;
+    private CharacterController characterController;
+    private Camera mainCamera;
+    private Animator animator;
+
+    // 카메라 원래 상태 저장 (1인칭 복귀용)
+    private Vector3 originalCamLocalPos;
+    private Quaternion originalCamLocalRot;
+    private int originalCullingMask;
+
+    // 레이어 인덱스 캐시
+    private int localPlayerLayerMask;
+
+    // 애니메이터 파라미터 해시
+    private static readonly int AnimDie = Animator.StringToHash("Die");
+    private static readonly int AnimRespawn = Animator.StringToHash("Respawn");
 
     void Start()
     {
         CurrentHp = maxHp;
+
+        // 컴포넌트 캐싱
+        playerController = GetComponent<PlayerController>();
+        playerShooter = GetComponent<PlayerShooter>();
+        paintReceiver = GetComponent<PaintReceiver>();
+        characterController = GetComponent<CharacterController>();
+
+        // 카메라 캐싱
+        if (playerController != null && playerController.cameraTransform != null)
+        {
+            mainCamera = playerController.cameraTransform.GetComponent<Camera>();
+            originalCamLocalPos = playerController.cameraTransform.localPosition;
+            originalCamLocalRot = playerController.cameraTransform.localRotation;
+            if (mainCamera != null)
+                originalCullingMask = mainCamera.cullingMask;
+        }
+
+        // 애니메이터 캐싱
+        // Player: PlayerController.animator 사용
+        // DummyEnemy 등: PlayerController가 없으면 자식에서 Animator를 직접 검색
+        if (playerController != null && playerController.animator != null)
+            animator = playerController.animator;
+        else
+            animator = GetComponentInChildren<Animator>();
+
+        // LocalPlayer 레이어 마스크 캐시
+        int localPlayerLayer = LayerMask.NameToLayer("LocalPlayer");
+        localPlayerLayerMask = (localPlayerLayer >= 0) ? (1 << localPlayerLayer) : 0;
     }
 
     // ── [테스트 전용] ─────────────────────────────────────────────
@@ -29,6 +95,9 @@ public class MonkeyHealth : MonoBehaviour
     // 적 AI가 완성되면 이 Update() 전체를 삭제한다.
     void Update()
     {
+        // PlayerController가 있는 오브젝트(=Player)에서만 테스트 키 작동
+        if (playerController == null) return;
+
         if (Input.GetKeyDown(KeyCode.T)) TakeDamage(10); // Body 피격 시뮬레이션
         if (Input.GetKeyDown(KeyCode.Y)) TakeDamage(20); // Head 피격 시뮬레이션
     }
@@ -52,15 +121,159 @@ public class MonkeyHealth : MonoBehaviour
         }
     }
 
+    // ── 사망 처리 ─────────────────────────────────────────────────
+
     /// <summary>
-    /// 체력이 0이 되었을 때 호출.
-    /// [왜 별도 메서드?] 사망 시 연출(이펙트, 사운드, 리스폰 등)을 
-    /// 이 메서드 안에서만 관리하면 돼서 유지보수가 편하다.
+    /// 사망 연출 시작. 코루틴으로 3초 데스캠 후 리스폰.
     /// </summary>
     void HandleDeath()
     {
         Debug.Log($"[처치] {gameObject.name} 사망!");
-        // TODO: 사망 연출 (ragdoll, 파티클, 데스캠 등) 추가 예정
-        // TODO: Photon 적용 시 리스폰 로직 연결
+        StartCoroutine(DeathRoutine());
+    }
+
+    IEnumerator DeathRoutine()
+    {
+        // === 1단계: 조작 잠금 ===
+        SetInputEnabled(false);
+
+        // === 2단계: 정체 노출! 투명화 완전 해제 ===
+        // 죽는 순간 스텔스가 풀리면서 원래 캐릭터 스킨이 100% 보인다
+        if (paintReceiver != null)
+            paintReceiver.SetReveal(1f);
+
+        // === 3단계: 사망 애니메이션 트리거 ===
+        if (animator != null)
+            animator.SetTrigger(AnimDie);
+
+        // === 4단계: 3인칭 데스캠 전환 ===
+        SwitchToDeathCam();
+
+        // === 5단계: 3초 대기 (데스캠 감상) ===
+        yield return new WaitForSeconds(deathCamDuration);
+
+        // === 6단계: 리스폰 ===
+        Respawn();
+    }
+
+    // ── 데스캠 카메라 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// 카메라를 등 뒤 3인칭 숄더뷰로 이동시킨다.
+    /// [벽 뚫림 방지] 캐릭터 머리에서 목표 위치로 SphereCast를 쏴서
+    /// 벽에 닿으면 충돌 지점 바로 앞까지만 카메라를 당긴다.
+    /// </summary>
+    void SwitchToDeathCam()
+    {
+        if (mainCamera == null) return;
+
+        Transform camTransform = mainCamera.transform;
+
+        // 1) LocalPlayer 레이어를 컬링 마스크에 추가 (내 몸이 보이게)
+        mainCamera.cullingMask |= localPlayerLayerMask;
+
+        // 2) 월드 기준 카메라 목표 위치 계산
+        Vector3 headWorldPos = camTransform.position; // 현재 1인칭 카메라 위치 ≈ 머리
+        Vector3 targetWorldPos = transform.TransformPoint(deathCamOffset);
+
+        // 3) 벽 뚫림 방지: 머리 → 목표 방향으로 SphereCast
+        Vector3 direction = targetWorldPos - headWorldPos;
+        float maxDist = direction.magnitude;
+        RaycastHit hit;
+
+        // Default(0)와 Floor(6) 레이어에 대해 벽 충돌 체크
+        int wallMask = (1 << 0) | (1 << LayerMask.NameToLayer("Floor"));
+
+        if (Physics.SphereCast(headWorldPos, cameraCollisionRadius, direction.normalized,
+            out hit, maxDist, wallMask))
+        {
+            // 벽에 닿았으면, 충돌 지점에서 살짝 앞으로 당김
+            float safeDist = Mathf.Max(hit.distance - cameraCollisionRadius, 0.3f);
+            targetWorldPos = headWorldPos + direction.normalized * safeDist;
+        }
+
+        // 4) 카메라 이동 & 캐릭터를 바라보게 회전
+        camTransform.position = targetWorldPos;
+        camTransform.LookAt(headWorldPos);
+    }
+
+    /// <summary>
+    /// 카메라를 원래 1인칭 위치/회전으로 복원한다.
+    /// </summary>
+    void RestoreFirstPersonCam()
+    {
+        if (mainCamera == null) return;
+
+        Transform camTransform = mainCamera.transform;
+
+        // 위치/회전 복원
+        camTransform.localPosition = originalCamLocalPos;
+        camTransform.localRotation = originalCamLocalRot;
+
+        // LocalPlayer 레이어를 컬링 마스크에서 제거 (내 몸 다시 숨기기)
+        mainCamera.cullingMask &= ~localPlayerLayerMask;
+    }
+
+    // ── 리스폰 ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 완전한 리스폰 처리.
+    /// [순서가 중요한 이유]
+    /// 1. 카메라를 먼저 1인칭으로 복원해야 텔레포트 후 시점이 정상.
+    /// 2. CC를 끄고 이동한 뒤 켜야 물리 캐싱 텔레포트 버그 방지.
+    /// 3. 페인트/애니메이션을 초기화한 뒤 조작을 풀어야 깨끗한 상태로 시작.
+    /// </summary>
+    void Respawn()
+    {
+        Debug.Log($"[리스폰] {gameObject.name} 부활!");
+
+        // 1) 카메라 1인칭 복원
+        RestoreFirstPersonCam();
+
+        // 2) CC 텔레포트 (enabled 토글로 물리 캐싱 버그 방지)
+        Vector3 spawnPos = Vector3.zero;
+        if (SpawnManager.Instance != null)
+            spawnPos = SpawnManager.Instance.GetRandomSpawnPoint();
+        else
+            spawnPos = new Vector3(0f, 1.5f, 0f); // 안전 폴백
+
+        if (characterController != null)
+        {
+            characterController.enabled = false;
+            transform.position = spawnPos;
+            characterController.enabled = true;
+        }
+        else
+        {
+            transform.position = spawnPos;
+        }
+
+        // 3) HP 복구
+        CurrentHp = maxHp;
+
+        // 4) 페인트 완전 초기화 (깨끗한 몸으로 부활)
+        if (paintReceiver != null)
+            paintReceiver.ClearPaintMap();
+
+        // 5) 애니메이션 리셋 (Respawn 트리거로 Idle 복귀)
+        if (animator != null)
+        {
+            animator.ResetTrigger(AnimDie);
+            animator.SetTrigger(AnimRespawn);
+        }
+
+        // 6) 조작 활성화 (마지막에 풀어야 안전)
+        SetInputEnabled(true);
+    }
+
+    // ── 유틸리티 ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// PlayerController와 PlayerShooter의 입력을 동시에 토글한다.
+    /// </summary>
+    void SetInputEnabled(bool enabled)
+    {
+        if (playerController != null) playerController.inputEnabled = enabled;
+        if (playerShooter != null) playerShooter.inputEnabled = enabled;
     }
 }

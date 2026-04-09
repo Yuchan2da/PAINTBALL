@@ -31,6 +31,13 @@ public class PlayerShooter : MonoBehaviour
     private Collider[] ownerHitboxes;   // 자기 Head/Body 콜라이더 캐시
     private PaintReceiver paintReceiver; // 테스트용 캐시
 
+    // ── 외부 제어 (사망/리스폰) ────────────────────────────────────
+    /// <summary>
+    /// false로 설정하면 사격, 재장전, 테스트 입력이 모두 잠긴다.
+    /// MonkeyHealth에서 사망/부활 시 토글한다.
+    /// </summary>
+    [HideInInspector] public bool inputEnabled = true;
+
     void Start()
     {
         CurrentAmmo = maxAmmo;
@@ -59,6 +66,8 @@ public class PlayerShooter : MonoBehaviour
 
     void Update()
     {
+        if (!inputEnabled) return; // 사망 상태에서는 모든 입력 차단
+
         if (Input.GetMouseButton(0) && Time.time >= lastFireTime + fireCooldown && CurrentAmmo > 0)
             Fire();
 
