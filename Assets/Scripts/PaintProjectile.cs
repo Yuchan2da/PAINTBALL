@@ -21,6 +21,7 @@ public class PaintProjectile : MonoBehaviour
 
     [HideInInspector] public Color teamColor = Color.red;
     [HideInInspector] public Transform ownerRoot;
+    [HideInInspector] public string shooterName;
 
     private Rigidbody rb;
     private float timer;
@@ -77,9 +78,10 @@ public class PaintProjectile : MonoBehaviour
         {
             ContactPoint contact = collision.GetContact(0);
 
-            int damage = collision.gameObject.CompareTag("Head") ? 20 : 10;
+            bool isHeadshot = collision.gameObject.CompareTag("Head");
+            int damage = isHeadshot ? 20 : 10;
             var health = collision.gameObject.GetComponentInParent<MonkeyHealth>();
-            if (health != null) health.TakeDamage(damage);
+            if (health != null) health.TakeDamage(damage, shooterName, isHeadshot);
 
             var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)

@@ -95,8 +95,9 @@ public class PlayerShooter : MonoBehaviour
         var pp = bullet.GetComponent<PaintProjectile>();
         if (pp != null)
         {
-            pp.teamColor  = teamColor;
-            pp.ownerRoot  = transform.root;
+            pp.teamColor    = teamColor;
+            pp.ownerRoot    = transform.root;
+            pp.shooterName  = gameObject.name;
         }
 
         // ── 자기 히트박스와 물리 충돌 무시 ──

@@ -37,6 +37,10 @@ public class MonkeyHealth : MonoBehaviour
     public int CurrentHp { get; private set; }
     public bool IsDead => CurrentHp <= 0;
 
+    // 마지막으로 데미지를 준 플레이어 정보 (킬 판정용)
+    private string lastAttackerName;
+    private bool lastWasHeadshot;
+
     // ── 캐시 ──────────────────────────────────────────────────────
     private PlayerController playerController;
     private PlayerShooter playerShooter;
@@ -98,20 +102,29 @@ public class MonkeyHealth : MonoBehaviour
         // PlayerController가 있는 오브젝트(=Player)에서만 테스트 키 작동
         if (playerController == null) return;
 
-        if (Input.GetKeyDown(KeyCode.T)) TakeDamage(10); // Body 피격 시뮬레이션
-        if (Input.GetKeyDown(KeyCode.Y)) TakeDamage(20); // Head 피격 시뮬레이션
+        if (Input.GetKeyDown(KeyCode.T)) TakeDamage(10, gameObject.name, false); // Body 피격 시뮬레이션
+        if (Input.GetKeyDown(KeyCode.Y)) TakeDamage(20, gameObject.name, true);  // Head 피격 시뮬레이션
     }
     // ─────────────────────────────────────────────────────────────
 
     /// <summary>
     /// 외부에서 호출하는 유일한 데미지 진입점.
+    /// killerName: 데미지를 준 플레이어 이름 (킬 판정용)
+    /// isHeadshot: 헤드샷 여부 (킬 피드 표시용)
     /// </summary>
-    public void TakeDamage(int damage)
+    public void TakeDamage(int damage, string killerName = "", bool isHeadshot = false)
     {
         if (IsDead) return; // 이미 죽은 대상 중복 처리 방지
 
         CurrentHp -= damage;
         CurrentHp = Mathf.Max(CurrentHp, 0); // 음수 방지
+
+        // 마지막 공격자 정보 캐싱 (킬 판정에 사용)
+        if (!string.IsNullOrEmpty(killerName))
+        {
+            lastAttackerName = killerName;
+            lastWasHeadshot = isHeadshot;
+        }
 
         Debug.Log($"[피격] {gameObject.name} | 데미지: {damage} | 남은 HP: {CurrentHp}/{maxHp}");
 
@@ -128,7 +141,12 @@ public class MonkeyHealth : MonoBehaviour
     /// </summary>
     void HandleDeath()
     {
-        Debug.Log($"[처치] {gameObject.name} 사망!");
+        Debug.Log($"[처치] {gameObject.name} 사망! (by {lastAttackerName})");
+
+        // ScoreManager에 킬/데스 기록
+        if (ScoreManager.Instance != null && !string.IsNullOrEmpty(lastAttackerName))
+            ScoreManager.Instance.RecordKill(lastAttackerName, gameObject.name, lastWasHeadshot);
+
         StartCoroutine(DeathRoutine());
     }
 
@@ -225,6 +243,10 @@ public class MonkeyHealth : MonoBehaviour
     /// </summary>
     void Respawn()
     {
+        // 게임 오버 상태면 리스폰하지 않음
+        if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
+            return;
+
         Debug.Log($"[리스폰] {gameObject.name} 부활!");
 
         // 1) 카메라 1인칭 복원
