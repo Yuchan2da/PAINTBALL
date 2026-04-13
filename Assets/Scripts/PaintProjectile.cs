@@ -23,6 +23,9 @@ public class PaintProjectile : MonoBehaviour
     [HideInInspector] public Transform ownerRoot;
     [HideInInspector] public string shooterName;
 
+    [Tooltip("탄착 스플래시 파티클 프리팫 (ObjectPoolManager에서 설정)")]
+    [HideInInspector] public GameObject hitSplashPrefab;
+
     private Rigidbody rb;
     private float timer;
 
@@ -73,7 +76,7 @@ public class PaintProjectile : MonoBehaviour
             return;
         }
 
-        // ── 히트박스 충돌 → 데미지 + 페인트 ─────────────────────
+        // ── 히트박스 충돌 → 데미지 + 페인트 + 이펙트 ────────────
         if (collision.gameObject.CompareTag("Head") || collision.gameObject.CompareTag("Body"))
         {
             ContactPoint contact = collision.GetContact(0);
@@ -86,6 +89,13 @@ public class PaintProjectile : MonoBehaviour
             var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)
                 paintReceiver.PaintAt(contact.point, contact.normal, teamColor);
+
+            // ── 피격 사운드 ──
+            if (SFXManager.Instance != null)
+                SFXManager.Instance.PlayHit(contact.point, isHeadshot);
+
+            // ── 탄착 스플래시 파티클 ──
+            SpawnHitSplash(contact.point, contact.normal);
 
             ReturnToPool();
             return;
@@ -115,5 +125,23 @@ public class PaintProjectile : MonoBehaviour
             ObjectPoolManager.Instance.ReturnProjectile(gameObject);
         else
             gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// 충돌 지점에 페인트 튤는 파티클을 생성한다.
+    /// 팀 컬러로 파티클 색상을 동적 변경.
+    /// </summary>
+    void SpawnHitSplash(Vector3 position, Vector3 normal)
+    {
+        if (hitSplashPrefab == null) return;
+
+        var go = Instantiate(hitSplashPrefab, position, Quaternion.LookRotation(normal));
+        var ps = go.GetComponent<ParticleSystem>();
+        if (ps != null)
+        {
+            var main = ps.main;
+            main.startColor = teamColor;
+        }
+        Destroy(go, 1f);
     }
 }

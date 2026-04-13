@@ -53,6 +53,10 @@ public class PlayerController : MonoBehaviour
     private float xRotation;
     private bool _isGrounded; // HandleMovement에서 매 프레임 갱신
 
+    // 카메라 반동
+    private float recoilOffset;         // 현재 반동으로 밀린 각도
+    private float recoilRecoverySpeed = 10f; // 복구 속도
+
     /// <summary>
     /// 캐릭터가 바닥에 닿아있는지 여부. FootprintManager에서 참조.
     /// </summary>
@@ -96,6 +100,15 @@ public class PlayerController : MonoBehaviour
 
         float mouseX = Input.GetAxisRaw("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxisRaw("Mouse Y") * mouseSensitivity;
+
+        // 반동 복구: 매 프레임 부드럽게 0으로 회복
+        if (recoilOffset > 0f)
+        {
+            float recovery = recoilRecoverySpeed * Time.deltaTime;
+            float applied = Mathf.Min(recovery, recoilOffset);
+            xRotation += applied;   // 반동은 음수(위)였으므로, 복구는 양수(아래)
+            recoilOffset -= applied;
+        }
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, upLimit, downLimit);
@@ -190,6 +203,18 @@ public class PlayerController : MonoBehaviour
         decal.transform.position = footPosition;
         // 바닥에 눕히기: Quad 앞면(-Z)이 위(+Y)를 향하도록
         decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, Vector3.up);
+    }
+
+    // ── 카메라 반동 ───────────────────────────────────────────────
+
+    /// <summary>
+    /// 외부(PlayerShooter)에서 호출. 카메라를 즉시 위로 밀고,
+    /// HandleLook()에서 매 프레임 자연스럽게 복구한다.
+    /// </summary>
+    public void ApplyRecoil(float angle)
+    {
+        xRotation -= angle;  // 음수 = 위로
+        recoilOffset += angle;
     }
 
     // ── Animator 헬퍼 ─────────────────────────────────────────────

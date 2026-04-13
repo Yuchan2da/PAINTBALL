@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// 1인칭 사격 처리 스크립트.
@@ -16,6 +17,14 @@ public class PlayerShooter : MonoBehaviour
     public Camera playerCamera;
     public float fireForce = 35f;
 
+    [Header("이펙트")]
+    [Tooltip("총구 화염 ParticleSystem (firePoint 자식으로 배치)")]
+    public ParticleSystem muzzleFlash;
+
+    [Header("카메라 반동")]
+    [Tooltip("발사 시 카메라 반동 각도 (X축 위로)")]
+    public float recoilAngle = 2f;
+
     [Header("팀 색상")]
     [Tooltip("이 플레이어가 발사하는 총알 색상. 멀티플레이에서 Photon으로 동기화 예정")]
     public Color teamColor = Color.red;
@@ -23,13 +32,19 @@ public class PlayerShooter : MonoBehaviour
     [Header("연사 / 탄창 설정")]
     public float fireCooldown = 0.33f;
     public int maxAmmo = 15;
+    [Tooltip("재장전 소요 시간 (초)")]
+    public float reloadTime = 2.5f;
 
     public int CurrentAmmo { get; private set; }
     public int MaxAmmo => maxAmmo;
 
     private float lastFireTime;
-    private Collider[] ownerHitboxes;   // 자기 Head/Body 콜라이더 캐시
-    private PaintReceiver paintReceiver; // 테스트용 캐시
+    private Collider[] ownerHitboxes;
+    private PaintReceiver paintReceiver;
+    private bool isReloading;
+
+    /// <summary>재장전 중 여부 (HUD에서 참조)</summary>
+    public bool IsReloading => isReloading;
 
     // ── 외부 제어 (사망/리스폰) ────────────────────────────────────
     /// <summary>
@@ -68,14 +83,17 @@ public class PlayerShooter : MonoBehaviour
     {
         if (!inputEnabled) return; // 사망 상태에서는 모든 입력 차단
 
-        if (Input.GetMouseButton(0) && Time.time >= lastFireTime + fireCooldown && CurrentAmmo > 0)
+        if (Input.GetMouseButton(0) && Time.time >= lastFireTime + fireCooldown && CurrentAmmo > 0 && !isReloading)
             Fire();
 
-        if (Input.GetMouseButtonDown(0) && CurrentAmmo <= 0)
-            Debug.Log("탄창이 비었습니다! R키로 재장전하세요.");
+        if (Input.GetMouseButtonDown(0) && CurrentAmmo <= 0 && !isReloading)
+        {
+            // 빈 탄창 → 자동 재장전 시작
+            StartCoroutine(ReloadRoutine());
+        }
 
-        if (Input.GetKeyDown(KeyCode.R) && CurrentAmmo < maxAmmo)
-            Reload();
+        if (Input.GetKeyDown(KeyCode.R) && CurrentAmmo < maxAmmo && !isReloading)
+            StartCoroutine(ReloadRoutine());
 
         // [테스트 전용] G키 — 파란 팀 피격 시뮬레이션. 멀티플레이 완성 후 삭제.
         if (Input.GetKeyDown(KeyCode.G))
@@ -118,12 +136,37 @@ public class PlayerShooter : MonoBehaviour
         if (rb != null)
             rb.AddForce(playerCamera.transform.forward * fireForce, ForceMode.Impulse);
 
+        // ── 총구 화염 파티클 ──
+        if (muzzleFlash != null)
+            muzzleFlash.Play();
+
+        // ── 발사음 ──
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.PlayShot(firePoint.position);
+
+        // ── 카메라 반동 ──
+        var pc = GetComponent<PlayerController>();
+        if (pc != null)
+            pc.ApplyRecoil(recoilAngle);
+
         Debug.Log($"발사! 잔탄: {CurrentAmmo}/{maxAmmo}");
     }
 
-    void Reload()
+    IEnumerator ReloadRoutine()
     {
+        isReloading = true;
+
+        // 재장전 사운드 (시작 시 재생)
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.PlayReload(transform.position);
+
+        Debug.Log($"재장전 중... ({reloadTime}초)");
+
+        yield return new WaitForSeconds(reloadTime);
+
         CurrentAmmo = maxAmmo;
+        isReloading = false;
+
         Debug.Log($"재장전 완료! {CurrentAmmo}/{maxAmmo}");
     }
 

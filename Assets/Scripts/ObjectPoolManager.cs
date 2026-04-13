@@ -26,6 +26,10 @@ public class ObjectPoolManager : MonoBehaviour
     public GameObject footprintPrefab;
     public int footprintPoolSize = 80;
 
+    [Header("탄착 이펙트")]
+    [Tooltip("탄착 스플래시 파티클 프리팹")]
+    public GameObject hitSplashPrefab;
+
     // 풀별 Queue 분리 — 서로 다른 프리팹이 섞이는 사고 방지
     private Queue<GameObject> projectilePool = new Queue<GameObject>();
     private Queue<GameObject> decalPool = new Queue<GameObject>();
@@ -70,7 +74,16 @@ public class ObjectPoolManager : MonoBehaviour
 
     public GameObject GetProjectile()
     {
-        return GetFromPool(projectilePool, projectilePrefab);
+        var obj = GetFromPool(projectilePool, projectilePrefab);
+
+        // 탄착 스플래시 프리팫 주입
+        if (hitSplashPrefab != null)
+        {
+            var pp = obj.GetComponent<PaintProjectile>();
+            if (pp != null) pp.hitSplashPrefab = hitSplashPrefab;
+        }
+
+        return obj;
     }
 
     public void ReturnProjectile(GameObject obj)
