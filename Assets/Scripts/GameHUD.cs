@@ -136,6 +136,18 @@ public class GameHUD : MonoBehaviour
     {
         if (playerShooter == null || ammoText == null) return;
 
+        // 재장전 중이면 별도 표시
+        if (playerShooter.IsReloading)
+        {
+            if (lastAmmo != -2) // 이미 표시 중이면 스킵
+            {
+                lastAmmo = -2;
+                ammoText.text = "RELOADING...";
+                ammoText.color = Color.yellow;
+            }
+            return;
+        }
+
         int current = playerShooter.CurrentAmmo;
         if (current == lastAmmo) return; // 변화 없으면 스킵
 
