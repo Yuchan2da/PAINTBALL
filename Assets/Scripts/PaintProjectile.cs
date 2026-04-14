@@ -29,20 +29,11 @@ public class PaintProjectile : MonoBehaviour
     private Rigidbody rb;
     private float timer;
 
-    // ── 레이어 ID 캐싱 (StringToHash와 동일 원리 — 매 프레임 문자열 비교 방지) ──
-    private static int floorLayer  = -1;
-
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
 
-        // 레이어 ID는 앱 수명 전체에서 동일하므로 최초 1회만 조회
-        if (floorLayer < 0)
-            floorLayer = LayerMask.NameToLayer("Floor");
-
         // 풀에서 인스턴스가 생성될 때 Projectile 레이어 강제 적용
-        // [왜?] 프리팹 레이어를 바꿔도 이미 Instantiate된 풀 인스턴스에는
-        // 반영되지 않을 수 있으므로, 코드에서 확실히 보장한다.
         int projLayer = LayerMask.NameToLayer("Projectile");
         if (projLayer >= 0) gameObject.layer = projLayer;
     }
@@ -63,18 +54,8 @@ public class PaintProjectile : MonoBehaviour
     void OnCollisionEnter(Collision collision)
     {
         // ── 자해 방지 ──────────────────────────────────────────
-        // Hitbox 레이어로 격리했기 때문에 대부분 방지되지만,
-        // 멀티플레이에서 같은 팀 히트박스와 충돌할 수 있으므로 이중 안전장치.
         if (ownerRoot != null && collision.transform.root == ownerRoot)
             return;
-
-        // ── 바닥 충돌 → 데칼 ────────────────────────────────────
-        if (collision.gameObject.layer == floorLayer)
-        {
-            SpawnDecal(collision);
-            ReturnToPool();
-            return;
-        }
 
         // ── 히트박스 충돌 → 데미지 + 페인트 + 이펙트 ────────────
         if (collision.gameObject.CompareTag("Head") || collision.gameObject.CompareTag("Body"))
@@ -101,12 +82,15 @@ public class PaintProjectile : MonoBehaviour
             return;
         }
 
-        // ── 그 외 (벽 등) → 회수 ────────────────────────────────
+        // ── 모든 표면 (바닥, 벽, 상자, 드럼통 등) → 데칼 + 스플래시 ──
+        SpawnDecal(collision);
+        ContactPoint cp = collision.GetContact(0);
+        SpawnHitSplash(cp.point, cp.normal);
         ReturnToPool();
     }
 
     /// <summary>
-    /// 바닥에 페인트 데칼을 배치한다.
+    /// 표면에 페인트 데칼을 배치한다.
     /// </summary>
     void SpawnDecal(Collision collision)
     {
@@ -117,6 +101,16 @@ public class PaintProjectile : MonoBehaviour
 
         decal.transform.position = contact.point + contact.normal * 0.01f;
         decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, contact.normal);
+
+        // 팀 컬러 적용
+        var mr = decal.GetComponent<MeshRenderer>();
+        if (mr != null)
+        {
+            var mpb = new MaterialPropertyBlock();
+            mr.GetPropertyBlock(mpb);
+            mpb.SetColor("_Color", teamColor);
+            mr.SetPropertyBlock(mpb);
+        }
     }
 
     void ReturnToPool()
