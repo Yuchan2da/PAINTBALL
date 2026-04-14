@@ -17,7 +17,7 @@ public class FootprintDecal : MonoBehaviour
     private float timer;
     private Renderer cachedRenderer;
     private MaterialPropertyBlock mpb;
-    private static readonly int ColorProp = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorProp = Shader.PropertyToID("_Color");
 
     void Awake()
     {
@@ -28,12 +28,17 @@ public class FootprintDecal : MonoBehaviour
     void OnEnable()
     {
         timer = lifeTime;
+    }
 
-        // 형광 핫핑크 색상으로 틴팅 (매번 풀에서 꺼낼 때 적용)
+    /// <summary>
+    /// 발자국 색상을 외부에서 설정한다 (팀 컬러).
+    /// </summary>
+    public void SetColor(Color color)
+    {
         if (cachedRenderer != null)
         {
             cachedRenderer.GetPropertyBlock(mpb);
-            mpb.SetColor(ColorProp, new Color(1f, 0f, 0.8f, 1f)); // 핫핑크
+            mpb.SetColor(ColorProp, color);
             cachedRenderer.SetPropertyBlock(mpb);
         }
     }

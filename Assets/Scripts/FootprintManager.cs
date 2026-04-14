@@ -32,6 +32,7 @@ public class FootprintManager : MonoBehaviour
     // ── 캐시 ──────────────────────────────────────────────────────
     private PlayerController playerController;
     private CharacterController characterController;
+    private PlayerShooter playerShooter;
 
     private Vector3 lastFootprintPos;
     private int paintTriggerMask;
@@ -40,6 +41,7 @@ public class FootprintManager : MonoBehaviour
     {
         playerController = GetComponent<PlayerController>();
         characterController = GetComponent<CharacterController>();
+        playerShooter = GetComponent<PlayerShooter>();
 
         lastFootprintPos = transform.position;
 
@@ -124,5 +126,10 @@ public class FootprintManager : MonoBehaviour
 
         // 스케일 축소
         fp.transform.localScale = Vector3.one * footprintScale;
+
+        // 팀 컬러 적용
+        Color teamCol = (playerShooter != null) ? playerShooter.teamColor : Color.red;
+        var fpDecal = fp.GetComponent<FootprintDecal>();
+        if (fpDecal != null) fpDecal.SetColor(teamCol);
     }
 }
