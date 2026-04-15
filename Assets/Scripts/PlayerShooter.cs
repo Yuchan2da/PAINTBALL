@@ -46,18 +46,26 @@ public class PlayerShooter : MonoBehaviour
     /// <summary>재장전 중 여부 (HUD에서 참조)</summary>
     public bool IsReloading => isReloading;
 
-    // ── 외부 제어 (사망/리스폰) ────────────────────────────────────
+    // ── 외부 제어 (사망/리스폰 + 멀티플레이) ──────────────────────
     /// <summary>
-    /// false로 설정하면 사격, 재장전, 테스트 입력이 모두 잠긴다.
+    /// false로 설정하면 사격, 재장전이 모두 잠긴다.
     /// MonkeyHealth에서 사망/부활 시 토글한다.
     /// </summary>
     [HideInInspector] public bool inputEnabled = true;
+
+    /// <summary>
+    /// 로컬 플레이어 여부. Photon 연동 시 photonView.IsMine으로 교체.
+    /// </summary>
+    [HideInInspector] public bool isLocalPlayer = true;
 
     void Start()
     {
         CurrentAmmo = maxAmmo;
         CacheHitboxColliders();
-        paintReceiver = GetComponent<PaintReceiver>();
+
+        // Inspector 미연결 시 자동 탐색
+        if (playerCamera == null)
+            playerCamera = GetComponentInChildren<Camera>();
     }
 
     /// <summary>
@@ -81,7 +89,8 @@ public class PlayerShooter : MonoBehaviour
 
     void Update()
     {
-        if (!inputEnabled) return; // 사망 상태에서는 모든 입력 차단
+        if (!isLocalPlayer) return;    // 원격 플레이어 입력 차단
+        if (!inputEnabled) return;     // 사망 상태 입력 차단
 
         if (Input.GetMouseButton(0) && Time.time >= lastFireTime + fireCooldown && CurrentAmmo > 0 && !isReloading)
             Fire();
@@ -94,10 +103,6 @@ public class PlayerShooter : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.R) && CurrentAmmo < maxAmmo && !isReloading)
             StartCoroutine(ReloadRoutine());
-
-        // [테스트 전용] G키 — 파란 팀 피격 시뮬레이션. 멀티플레이 완성 후 삭제.
-        if (Input.GetKeyDown(KeyCode.G))
-            SimulateEnemyHit(Color.blue);
     }
 
     void Fire()
@@ -170,24 +175,4 @@ public class PlayerShooter : MonoBehaviour
         Debug.Log($"재장전 완료! {CurrentAmmo}/{maxAmmo}");
     }
 
-    /// <summary>
-    /// [테스트 전용] 적 팀에게 맞은 상황을 시뮬레이션한다.
-    /// Raycast를 우회하고 랜덤 UV에 직접 페인트한다.
-    /// [왜 PaintAtRandomUV?]
-    /// SimulateEnemyHit은 실제 총알 충돌이 아니므로,
-    /// 월드→UV 변환 Raycast가 정확하지 않을 수 있다.
-    /// 테스트 목적이므로 UV에 직접 칠하는 게 더 확실하고 빠르다.
-    /// 멀티플레이 완성 후 삭제할 것.
-    /// </summary>
-    void SimulateEnemyHit(Color enemyColor)
-    {
-        if (paintReceiver == null)
-        {
-            Debug.LogWarning("[테스트] Player에 PaintReceiver가 없습니다!");
-            return;
-        }
-
-        paintReceiver.PaintAtRandomUV(enemyColor);
-        Debug.Log("[테스트] 파란 팀 피격 시뮬레이션 — 랜덤 UV 페인트");
-    }
 }

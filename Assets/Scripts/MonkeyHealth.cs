@@ -94,18 +94,7 @@ public class MonkeyHealth : MonoBehaviour
         localPlayerLayerMask = (localPlayerLayer >= 0) ? (1 << localPlayerLayer) : 0;
     }
 
-    // ── [테스트 전용] ─────────────────────────────────────────────
-    // 적 AI가 없는 프로토타입 단계에서 HP 감소를 확인하기 위한 임시 코드.
-    // 적 AI가 완성되면 이 Update() 전체를 삭제한다.
-    void Update()
-    {
-        // PlayerController가 있는 오브젝트(=Player)에서만 테스트 키 작동
-        if (playerController == null) return;
-
-        if (Input.GetKeyDown(KeyCode.T)) TakeDamage(10, gameObject.name, false); // Body 피격 시뮬레이션
-        if (Input.GetKeyDown(KeyCode.Y)) TakeDamage(20, gameObject.name, true);  // Head 피격 시뮬레이션
-    }
-    // ─────────────────────────────────────────────────────────────
+    // [테스트 코드 제거됨] T/Y키 데미지 시뮬레이션 — 멀티플레이 전환으로 삭제.
 
     /// <summary>
     /// 외부에서 호출하는 유일한 데미지 진입점.
