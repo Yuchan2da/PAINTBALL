@@ -64,8 +64,9 @@ public class PaintProjectile : MonoBehaviour
 
             bool isHeadshot = collision.gameObject.CompareTag("Head");
             int damage = isHeadshot ? 20 : 10;
-            var health = collision.gameObject.GetComponentInParent<MonkeyHealth>();
-            if (health != null) health.TakeDamage(damage, shooterName, isHeadshot);
+
+            // 데미지 판정 (Photon 전환 시 이 호출만 RPC로 교체)
+            ApplyHitDamage(collision.gameObject, damage, isHeadshot);
 
             var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)
@@ -111,6 +112,17 @@ public class PaintProjectile : MonoBehaviour
             mpb.SetColor("_Color", teamColor);
             mr.SetPropertyBlock(mpb);
         }
+    }
+
+    /// <summary>
+    /// 데미지 판정 래퍼. 현재는 로컬에서 직접 호출.
+    /// [Photon 전환 시] 이 메서드를 RPC로 감싸서 사격자 → 피격자 클라이언트로 전달.
+    /// </summary>
+    void ApplyHitDamage(GameObject hitObject, int damage, bool isHeadshot)
+    {
+        var health = hitObject.GetComponentInParent<MonkeyHealth>();
+        if (health != null)
+            health.TakeDamage(damage, shooterName, isHeadshot);
     }
 
     void ReturnToPool()

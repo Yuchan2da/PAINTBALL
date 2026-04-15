@@ -27,16 +27,12 @@ public class PaintTrail : MonoBehaviour
     private CharacterController characterController;
 
     private Vector3 lastTrailPos;
-    private Color trailColor;
 
     void Start()
     {
         playerController = GetComponent<PlayerController>();
         playerShooter = GetComponent<PlayerShooter>();
         characterController = GetComponent<CharacterController>();
-
-        // 팀 색상 캐시
-        trailColor = (playerShooter != null) ? playerShooter.teamColor : Color.red;
 
         lastTrailPos = transform.position;
     }
@@ -104,9 +100,10 @@ public class PaintTrail : MonoBehaviour
         var renderer = decal.GetComponent<Renderer>();
         if (renderer != null)
         {
+            Color color = (playerShooter != null) ? playerShooter.teamColor : Color.red;
             MaterialPropertyBlock mpb = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(mpb);
-            mpb.SetColor("_BaseColor", trailColor);
+            mpb.SetColor("_Color", color);
             renderer.SetPropertyBlock(mpb);
         }
     }
