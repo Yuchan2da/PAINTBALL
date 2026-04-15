@@ -21112,6 +21112,7 @@ MonoBehaviour:
   maxAmmo: 15
   reloadTime: 2.5
   inputEnabled: 1
+  isLocalPlayer: 1
 --- !u!114 &1948656243
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21136,6 +21137,7 @@ MonoBehaviour:
   penaltyInterval: 5
   minMoveDistance: 1
   inputEnabled: 1
+  isLocalPlayer: 1
 --- !u!143 &1948656244
 CharacterController:
   m_ObjectHideFlags: 0
