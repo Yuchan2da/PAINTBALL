@@ -40,12 +40,18 @@ public class PlayerController : MonoBehaviour
     private static readonly int AnimIsGrounded = Animator.StringToHash("isGrounded");
     private static readonly int AnimJump       = Animator.StringToHash("Jump");
 
-    // ── 외부 제어 (사망/리스폰) ────────────────────────────────────
+    // ── 외부 제어 (사망/리스폰 + 멀티플레이) ──────────────────────
     /// <summary>
     /// false로 설정하면 이동, 시점 회전, 점프가 모두 잠긴다.
     /// MonkeyHealth에서 사망/부활 시 토글한다.
     /// </summary>
     [HideInInspector] public bool inputEnabled = true;
+
+    /// <summary>
+    /// 로컬 플레이어 여부. Photon 연동 시 photonView.IsMine으로 교체.
+    /// 원격 플레이어는 입력/카메라/커서를 비활성화한다.
+    /// </summary>
+    [HideInInspector] public bool isLocalPlayer = true;
 
     // ── 내부 상태 ─────────────────────────────────────────────────
     private CharacterController characterController;
@@ -69,8 +75,33 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         characterController = GetComponent<CharacterController>();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+
+        // 카메라/오디오: Inspector 미연결 시 자동 탐색
+        if (cameraTransform == null)
+        {
+            var cam = GetComponentInChildren<Camera>();
+            if (cam != null) cameraTransform = cam.transform;
+        }
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+
+        // ── 로컬/원격 분리 ──
+        if (isLocalPlayer)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            // 원격 플레이어: 카메라 + AudioListener 비활성화
+            if (cameraTransform != null)
+            {
+                var cam = cameraTransform.GetComponent<Camera>();
+                if (cam != null) cam.enabled = false;
+                var listener = cameraTransform.GetComponent<AudioListener>();
+                if (listener != null) listener.enabled = false;
+            }
+        }
 
         // 패널티 기준점을 시작 위치로 초기화
         penaltyCheckPosition = transform.position;
@@ -79,6 +110,9 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // 원격 플레이어는 입력 처리하지 않음
+        if (!isLocalPlayer) return;
+
         if (!inputEnabled)
         {
             // 사망 상태에서도 중력만 적용 (공중에서 죽으면 바닥으로 내려와야 함)

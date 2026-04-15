@@ -21,6 +21,8 @@ using System.Collections.Generic;
 /// </summary>
 public class GameHUD : MonoBehaviour
 {
+    public static GameHUD Instance { get; private set; }
+
     [Header("탄창 HUD")]
     [Tooltip("탄창 수를 표시할 TextMeshPro 컴포넌트")]
     public TMP_Text ammoText;
@@ -31,10 +33,10 @@ public class GameHUD : MonoBehaviour
     [Tooltip("체력 슬라이더 (선택). 비워두면 텍스트만 표시")]
     public Slider hpSlider;
 
-    [Header("연결 대상")]
-    [Tooltip("플레이어 오브젝트의 PlayerShooter 컴포넌트")]
+    [Header("연결 대상 (런타임 자동 등록)")]
+    [Tooltip("로컬 플레이어의 PlayerShooter. RegisterLocalPlayer()로 자동 설정됨")]
     public PlayerShooter playerShooter;
-    [Tooltip("플레이어 오브젝트의 MonkeyHealth 컴포넌트")]
+    [Tooltip("로컬 플레이어의 MonkeyHealth. RegisterLocalPlayer()로 자동 설정됨")]
     public MonkeyHealth playerHealth;
 
     [Header("킬 피드")]
@@ -70,6 +72,12 @@ public class GameHUD : MonoBehaviour
 
     // 킬 피드 큐
     private Queue<GameObject> killFeedQueue = new Queue<GameObject>();
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+    }
 
     void Start()
     {
@@ -107,6 +115,26 @@ public class GameHUD : MonoBehaviour
             // GameManager가 없으면 기본 HUD만 표시
             SetHudVisible(true);
         }
+    }
+
+    /// <summary>
+    /// 로컬 플레이어가 런타임에 스폰될 때 자기 자신을 HUD에 등록한다.
+    /// Photon에서 PhotonNetwork.Instantiate() 후 로컬 플레이어가 호출.
+    /// </summary>
+    public void RegisterLocalPlayer(PlayerShooter shooter, MonkeyHealth health)
+    {
+        playerShooter = shooter;
+        playerHealth = health;
+
+        // HP 슬라이더 초기화
+        if (hpSlider != null && playerHealth != null)
+        {
+            hpSlider.minValue = 0;
+            hpSlider.maxValue = playerHealth.maxHp;
+            hpSlider.value    = playerHealth.maxHp;
+        }
+
+        ForceRefresh();
     }
 
     void OnDestroy()
