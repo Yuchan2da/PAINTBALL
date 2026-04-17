@@ -1,13 +1,10 @@
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// 발자국 데칼 수명 관리.
-/// 풀에서 꺼내질 때 형광색으로 틴팅되고, 일정 시간 후 자동으로 풀에 반환된다.
-///
-/// [왜 PaintDecal과 별도?]
-/// PaintDecal은 바닥 페인트 자국(대형, 5초 수명)이고,
-/// FootprintDecal은 발자국(소형, 4초 수명, 형광색 틴팅).
-/// 역할과 수명이 다르므로 스크립트를 분리한다.
+/// DecalProjector 기반으로 표면에 투영되며, 팀 컬러로 틴팅된다.
+/// DecalTintCache의 정적 캐시를 사용하여 머티리얼을 공유.
 /// </summary>
 public class FootprintDecal : MonoBehaviour
 {
@@ -15,14 +12,11 @@ public class FootprintDecal : MonoBehaviour
     public float lifeTime = 4f;
 
     private float timer;
-    private Renderer cachedRenderer;
-    private MaterialPropertyBlock mpb;
-    private static readonly int ColorProp = Shader.PropertyToID("_Color");
+    private DecalProjector projector;
 
     void Awake()
     {
-        cachedRenderer = GetComponent<Renderer>();
-        mpb = new MaterialPropertyBlock();
+        projector = GetComponent<DecalProjector>();
     }
 
     void OnEnable()
@@ -32,14 +26,20 @@ public class FootprintDecal : MonoBehaviour
 
     /// <summary>
     /// 발자국 색상을 외부에서 설정한다 (팀 컬러).
+    /// material 변경 후 projector를 재활성화하여 렌더링 갱신.
     /// </summary>
     public void SetColor(Color color)
     {
-        if (cachedRenderer != null)
+        if (projector == null) return;
+
+        Material tinted = DecalTintCache.GetTintedMaterial(color, projector);
+        if (tinted != null)
         {
-            cachedRenderer.GetPropertyBlock(mpb);
-            mpb.SetColor(ColorProp, color);
-            cachedRenderer.SetPropertyBlock(mpb);
+            projector.material = tinted;
+
+            // DecalProjector 렌더링 강제 갱신
+            projector.enabled = false;
+            projector.enabled = true;
         }
     }
 
@@ -47,9 +47,7 @@ public class FootprintDecal : MonoBehaviour
     {
         timer -= Time.deltaTime;
         if (timer <= 0f)
-        {
             ReturnToPool();
-        }
     }
 
     void ReturnToPool()

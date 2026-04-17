@@ -92,6 +92,7 @@ public class PaintProjectile : MonoBehaviour
 
     /// <summary>
     /// 표면에 페인트 데칼을 배치한다.
+    /// DecalProjector를 사용하여 모서리에도 자연스럽게 투영된다.
     /// </summary>
     void SpawnDecal(Collision collision)
     {
@@ -100,18 +101,17 @@ public class PaintProjectile : MonoBehaviour
         ContactPoint contact = collision.GetContact(0);
         GameObject decal = ObjectPoolManager.Instance.GetDecal();
 
+        // 위치: 표면에서 살짝 띄워 배치
         decal.transform.position = contact.point + contact.normal * 0.01f;
-        decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, contact.normal);
+
+        // 회전: DecalProjector는 로컬 Z축 방향으로 투영하므로,
+        // 표면 노멀의 반대 방향(-normal)을 forward로 설정
+        decal.transform.rotation = Quaternion.LookRotation(-contact.normal, Vector3.up);
 
         // 팀 컬러 적용
-        var mr = decal.GetComponent<MeshRenderer>();
-        if (mr != null)
-        {
-            var mpb = new MaterialPropertyBlock();
-            mr.GetPropertyBlock(mpb);
-            mpb.SetColor("_Color", teamColor);
-            mr.SetPropertyBlock(mpb);
-        }
+        var paintDecal = decal.GetComponent<PaintDecal>();
+        if (paintDecal != null)
+            paintDecal.SetColor(teamColor);
     }
 
     /// <summary>

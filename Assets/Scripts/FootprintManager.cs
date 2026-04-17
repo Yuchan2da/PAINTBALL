@@ -111,21 +111,21 @@ public class FootprintManager : MonoBehaviour
         GameObject fp = ObjectPoolManager.Instance.GetFootprint();
         if (fp == null) return;
 
-        // 위치
-        fp.transform.position = footPos;
+        // 위치: 발바닥 살짝 위
+        fp.transform.position = footPos + Vector3.up * 0.02f;
 
-        // 방향: 캐릭터의 forward를 바닥에 투영하여 데칼 회전
+        // 방향: DecalProjector는 로컬 Z축 방향으로 투영
+        // 바닥을 향해 아래로 투영 (forward = -Y)
         Vector3 moveDir = transform.forward;
         moveDir.y = 0f;
         if (moveDir.sqrMagnitude < 0.001f)
             moveDir = Vector3.forward;
 
-        Quaternion flatRotation = Quaternion.LookRotation(moveDir.normalized, Vector3.up);
-        // Quad를 눕히기: X축 90도 회전 후 이동 방향 적용
-        fp.transform.rotation = flatRotation * Quaternion.Euler(90f, 0f, 0f);
+        // Z축이 아래를 향하도록 회전
+        fp.transform.rotation = Quaternion.LookRotation(Vector3.down, moveDir.normalized);
 
-        // 스케일 축소
-        fp.transform.localScale = Vector3.one * footprintScale;
+        // DecalProjector 크기는 프리팹에서 설정됨 (0.3m)
+        fp.transform.localScale = Vector3.one;
 
         // 팀 컬러 적용
         Color teamCol = (playerShooter != null) ? playerShooter.teamColor : Color.red;

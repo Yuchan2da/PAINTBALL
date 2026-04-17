@@ -96,15 +96,16 @@ public class PaintTrail : MonoBehaviour
         // 스케일
         decal.transform.localScale = Vector3.one * trailScale;
 
-        // 팀 컬러 적용 (MaterialPropertyBlock으로 원본 머티리얼 보존)
-        var renderer = decal.GetComponent<Renderer>();
-        if (renderer != null)
+        // 팀 컬러 적용 (DecalTintCache의 사전 생성 머티리얼 사용)
+        var projector = decal.GetComponent<UnityEngine.Rendering.Universal.DecalProjector>();
+        if (projector != null)
         {
             Color color = (playerShooter != null) ? playerShooter.teamColor : Color.red;
-            MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(mpb);
-            mpb.SetColor("_Color", color);
-            renderer.SetPropertyBlock(mpb);
+            Material tinted = DecalTintCache.GetTintedMaterial(color, projector);
+            if (tinted != null)
+            {
+                projector.material = tinted;
+            }
         }
     }
 }
