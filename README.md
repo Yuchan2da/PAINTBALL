@@ -57,9 +57,11 @@
 - **발자국 최적화**: 0.6m 간격 감지, 이동 방향 회전 적용, 4초 후 자동 소멸
 - 렌더링/물리 레이어 완전 분리 설계 (자식 오브젝트로 Trigger 콜라이더 격리)
 
-### 7. 페인트 데칼 (원형)
-- 총알이 모든 표면(바닥, 벽, 상자, 드럼통 등)에 맞으면 원형 팀 컬러 데칼 생성 (5초 소멸)
-- 알파 마스크 기반 원형 텍스처 + Sprites/Default 투명 셰이더 적용
+### 7. URP DecalProjector 기반 페인트 데칼
+- **URP DecalProjector**로 전환: 바닥·벽·모서리·곡면에도 자연스럽게 투영되는 데칼
+- **팀 컬러 사전 생성 머티리얼**: `DecalTintCache`가 팀별 사전 제작 머티리얼(Red/Blue)을 캐시 로드
+- Decal 셰이더 그래프 + DecalRendererFeature(ScreenSpace) 구성
+- 기존 MeshRenderer + MaterialPropertyBlock 방식 완전 폐기 (DecalProjector는 Renderer가 아니므로 MPB 무시됨)
 
 ### 8. 킬 피드 & 점수 시스템
 - 킬 발생 시 우상단 킬 피드 자동 표시 (`Player >> DummyEnemy [HEADSHOT]`)
