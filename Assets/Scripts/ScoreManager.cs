@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using Photon.Pun;
 
 /// <summary>
 /// 킬/데스 점수 관리 싱글톤.
@@ -10,7 +11,7 @@ using System.Collections.Generic;
 /// - 킬 발생 시 OnKillEvent를 발행하여 GameHUD의 킬 피드가 구독.
 /// - 순위 정렬은 킬 수 기준 내림차순. 동점이면 데스 적은 순.
 /// </summary>
-public class ScoreManager : MonoBehaviour
+public class ScoreManager : MonoBehaviourPun
 {
     public static ScoreManager Instance { get; private set; }
 
@@ -90,6 +91,30 @@ public class ScoreManager : MonoBehaviour
 
         // 킬 이벤트 발행 → GameHUD 킬 피드가 구독
         OnKillEvent?.Invoke(killerName, victimName, isHeadshot);
+    }
+
+    // ── 네트워크 킬 기록 ─────────────────────────────────────────
+
+    /// <summary>
+    /// 네트워크 환경에서의 킬 기록.
+    /// RPC로 전 클라이언트에 브로드캐스트하여 모든 화면에 킬피드 표시.
+    /// </summary>
+    public void RecordKillNetwork(string killerName, string victimName, bool isHeadshot)
+    {
+        if (photonView != null && PhotonNetwork.IsConnected)
+            photonView.RPC(nameof(RPC_RecordKill), RpcTarget.All, killerName, victimName, isHeadshot);
+        else
+            RecordKill(killerName, victimName, isHeadshot);
+    }
+
+    [PunRPC]
+    void RPC_RecordKill(string killerName, string victimName, bool isHeadshot)
+    {
+        // 미등록 플레이어 자동 등록 (뒤늦게 입장한 클라이언트 대응)
+        if (!scoreMap.ContainsKey(killerName)) RegisterPlayer(killerName);
+        if (!scoreMap.ContainsKey(victimName)) RegisterPlayer(victimName);
+
+        RecordKill(killerName, victimName, isHeadshot);
     }
 
     // ── 순위 조회 ────────────────────────────────────────────────────

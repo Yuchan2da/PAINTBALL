@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using Photon.Pun;
 
 /// <summary>
 /// 1인칭 사격 처리 스크립트.
@@ -10,7 +11,7 @@ using System.Collections;
 /// Player의 Head/Body도 Hitbox 레이어이므로, 자기 총알이 자기 히트박스에 맞을 수 있다.
 /// → Fire()에서 Physics.IgnoreCollision으로 자기 히트박스와의 물리 충돌을 차단한다.
 /// </summary>
-public class PlayerShooter : MonoBehaviour
+public class PlayerShooter : MonoBehaviourPun
 {
     [Header("사격 설정")]
     public Transform firePoint;
@@ -60,6 +61,10 @@ public class PlayerShooter : MonoBehaviour
 
     void Start()
     {
+        // Photon 연결 시 IsMine으로 로컬/원격 분리
+        if (PhotonNetwork.IsConnected && photonView != null)
+            isLocalPlayer = photonView.IsMine;
+
         CurrentAmmo = maxAmmo;
         CacheHitboxColliders();
 

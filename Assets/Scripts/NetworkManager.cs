@@ -28,23 +28,38 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// 네트워크 플레이어를 스폰한다.
+    /// 네트워크 플레이어를 스폰하고 로컬 시스템에 등록한다.
+    /// [스폰 후 처리]
+    /// 1. 닉네임 적용 → 킬피드/점수판에서 식별
+    /// 2. GameHUD 등록 → HP/탄창 UI 연결
+    /// 3. ScoreManager 등록 → 킬/데스 추적 시작
     /// </summary>
     void SpawnPlayer()
     {
-        // SpawnManager에서 랜덤 스폰 위치 가져오기
-        Vector3 spawnPos = Vector3.zero;
-        Quaternion spawnRot = Quaternion.identity;
-
-        if (SpawnManager.Instance != null)
-        {
-            spawnPos = SpawnManager.Instance.GetRandomSpawnPoint();
-        }
+        // SpawnManager에서 랜덤 스폰 위치
+        Vector3 spawnPos = (SpawnManager.Instance != null)
+            ? SpawnManager.Instance.GetRandomSpawnPoint()
+            : Vector3.zero;
 
         // Photon 네트워크로 플레이어 생성 (Resources 폴더에서 로드)
         GameObject player = PhotonNetwork.Instantiate(
-            playerPrefabName, spawnPos, spawnRot
+            playerPrefabName, spawnPos, Quaternion.identity
         );
+
+        // ── 닉네임 적용 (킬피드/점수판에서 이 이름으로 표시) ──
+        player.name = PhotonNetwork.NickName;
+
+        // ── HUD에 로컬 플레이어 등록 (HP/탄창 UI 연결) ──
+        if (GameHUD.Instance != null)
+        {
+            var shooter = player.GetComponent<PlayerShooter>();
+            var health  = player.GetComponent<MonkeyHealth>();
+            GameHUD.Instance.RegisterLocalPlayer(shooter, health);
+        }
+
+        // ── ScoreManager에 등록 (킬/데스 추적 시작) ──
+        if (ScoreManager.Instance != null)
+            ScoreManager.Instance.RegisterPlayer(PhotonNetwork.NickName);
 
         Debug.Log($"[NetworkManager] 플레이어 스폰 완료: {PhotonNetwork.NickName} at {spawnPos}");
     }

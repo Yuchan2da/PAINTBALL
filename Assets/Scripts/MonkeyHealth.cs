@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using Photon.Pun;
 
 /// <summary>
 /// 원숭이(적/플레이어) 체력 관리 + 사망 연출 + 리스폰 시스템.
@@ -18,7 +19,7 @@ using System.Collections;
 /// - PlayerController/Shooter는 inputEnabled만 읽고, 자신의 역할만 수행.
 /// - 추후 Photon 적용 시 TakeDamage/Respawn을 RPC로 교체하면 됨.
 /// </summary>
-public class MonkeyHealth : MonoBehaviour
+public class MonkeyHealth : MonoBehaviourPun
 {
     [Header("체력 설정")]
     public int maxHp = 100;
@@ -123,6 +124,28 @@ public class MonkeyHealth : MonoBehaviour
         }
     }
 
+    // ── 네트워크 데미지 ───────────────────────────────────────────
+
+    /// <summary>
+    /// 네트워크 환경에서의 데미지 진입점.
+    /// 사격자(A)가 호출 → RPC로 피격자(B)의 Owner에게 전달.
+    /// [왜 Owner에게만?] HP는 Owner가 관리해야 일관성 보장.
+    /// 여러 클라이언트가 동시에 HP를 깎으면 값이 꼬인다.
+    /// </summary>
+    public void TakeDamageNetwork(int damage, string killerName, bool isHeadshot)
+    {
+        if (photonView != null && PhotonNetwork.IsConnected)
+            photonView.RPC(nameof(RPC_TakeDamage), photonView.Owner, damage, killerName, isHeadshot);
+        else
+            TakeDamage(damage, killerName, isHeadshot);
+    }
+
+    [PunRPC]
+    void RPC_TakeDamage(int damage, string killerName, bool isHeadshot)
+    {
+        TakeDamage(damage, killerName, isHeadshot);
+    }
+
     // ── 사망 처리 ─────────────────────────────────────────────────
 
     /// <summary>
@@ -133,8 +156,14 @@ public class MonkeyHealth : MonoBehaviour
         Debug.Log($"[처치] {gameObject.name} 사망! (by {lastAttackerName})");
 
         // ScoreManager에 킬/데스 기록
+        // [네트워크] 연결 시 전 클라이언트에 RPC 브로드캐스트
         if (ScoreManager.Instance != null && !string.IsNullOrEmpty(lastAttackerName))
-            ScoreManager.Instance.RecordKill(lastAttackerName, gameObject.name, lastWasHeadshot);
+        {
+            if (PhotonNetwork.IsConnected)
+                ScoreManager.Instance.RecordKillNetwork(lastAttackerName, gameObject.name, lastWasHeadshot);
+            else
+                ScoreManager.Instance.RecordKill(lastAttackerName, gameObject.name, lastWasHeadshot);
+        }
 
         StartCoroutine(DeathRoutine());
     }
@@ -232,6 +261,11 @@ public class MonkeyHealth : MonoBehaviour
     /// </summary>
     void Respawn()
     {
+        // [네트워크] 로컬 플레이어만 리스폰 처리
+        // 원격 플레이어의 위치는 PhotonTransformView로 자동 동기화
+        if (PhotonNetwork.IsConnected && photonView != null && !photonView.IsMine)
+            return;
+
         // 게임 오버 상태면 리스폰하지 않음
         if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
             return;

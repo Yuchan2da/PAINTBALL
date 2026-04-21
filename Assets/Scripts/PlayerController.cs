@@ -1,4 +1,5 @@
 using UnityEngine;
+using Photon.Pun;
 
 /// <summary>
 /// 1인칭 플레이어 이동 + 시점 회전 + Animator 연동 + 정지 패널티.
@@ -10,7 +11,7 @@ using UnityEngine;
 ///   → 제자리 점프, 벽에 붙어서 키만 누르기 등의 꼼수를 원천 차단.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviourPun
 {
     [Header("이동 설정")]
     public float walkSpeed = 5f;
@@ -75,6 +76,10 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         characterController = GetComponent<CharacterController>();
+
+        // Photon 연결 시 IsMine으로 로컬/원격 분리
+        if (PhotonNetwork.IsConnected && photonView != null)
+            isLocalPlayer = photonView.IsMine;
 
         // 카메라/오디오: Inspector 미연결 시 자동 탐색
         if (cameraTransform == null)

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Photon.Pun;
 
 /// <summary>
 /// 물리 기반 페인트 총알.
@@ -115,14 +116,23 @@ public class PaintProjectile : MonoBehaviour
     }
 
     /// <summary>
-    /// 데미지 판정 래퍼. 현재는 로컬에서 직접 호출.
-    /// [Photon 전환 시] 이 메서드를 RPC로 감싸서 사격자 → 피격자 클라이언트로 전달.
+    /// 데미지 판정 래퍼.
+    /// [싱글] 로컬 health.TakeDamage() 직접 호출.
+    /// [멀티] health.TakeDamageNetwork() → RPC로 Owner에게 전달.
+    /// [완 총알은 네트워크 오브젝트가 아님]
+    /// 각 클라이언트에서 로컬로 생성/파괴하고, 충돌 감지 시 데미지만 RPC로 보낸다.
+    /// 이것이 FPS 게임의 표준 아키텍처.
     /// </summary>
     void ApplyHitDamage(GameObject hitObject, int damage, bool isHeadshot)
     {
         var health = hitObject.GetComponentInParent<MonkeyHealth>();
         if (health != null)
-            health.TakeDamage(damage, shooterName, isHeadshot);
+        {
+            if (PhotonNetwork.IsConnected)
+                health.TakeDamageNetwork(damage, shooterName, isHeadshot);
+            else
+                health.TakeDamage(damage, shooterName, isHeadshot);
+        }
     }
 
     void ReturnToPool()
