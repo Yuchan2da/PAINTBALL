@@ -16,8 +16,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        // Photon 연결 상태 확인
-        if (!PhotonNetwork.IsConnected)
+        // Photon 연결 상태 확인 (OfflineMode = 연습 모드도 허용)
+        if (!PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
         {
             Debug.LogWarning("[NetworkManager] Photon 미연결! 로비로 이동합니다.");
             UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
@@ -66,10 +66,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     /// <summary>
     /// 연결이 끊기면 로비로 복귀.
+    /// OfflineMode 초기화로 다음 연결을 보장.
     /// </summary>
     public override void OnDisconnected(Photon.Realtime.DisconnectCause cause)
     {
         Debug.LogWarning($"[NetworkManager] 연결 끊김: {cause}. 로비로 이동.");
+        PhotonNetwork.OfflineMode = false;
         UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
     }
 }

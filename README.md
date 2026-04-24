@@ -74,9 +74,10 @@
 
 ### 9. 게임 매니저 (라운드 시스템)
 - 상태 머신: 대기(Waiting) → 카운트다운(3초) → 플레이(3분) → 게임 오버
+- **PhotonNetwork.Time 기반 서버 시간 동기화** — 모든 클라이언트가 동일한 남은 시간 표시
 - 라운드 타이머 HUD 표시 (30초 이하 빨간색 경고)
 - 게임 오버 시 1등 표시 + 점수판 자동 오픈
-- 카운트다운/플레이 중 HP·탄약 HUD 자동 표시, 상태별 가시성 관리
+- 멀티플레이 GameOver → 자동 로비 복귀, 연습 모드 → 자동 재시작
 - SyncToCurrentState 패턴으로 Start() 실행 순서 무관하게 안전 동기화
 ### 10. 사격 이펙트 & 사운드
 - SFXManager: AudioSource 풀링(10개) 기반 3D 사운드 재생 시스템
@@ -99,19 +100,22 @@
 - Mixed Lighting + GPU 라이트맵 베이크 (1024×1024 × 4장)
 - Occlusion Culling 베이크 (미로형 맵 특화)
 
-### 13. Photon PUN 2 로비 시스템
-- LobbyScene: 닉네임 입력 → 자동 매칭 → 게임 씬 로드
-- LobbyManager: Photon 마스터 서버 연결 + 방 생성/참가
-- NetworkManager: 게임 씬 진입 시 Player 네트워크 스폰
-- Player/DummyEnemy 프리팹화 (Resources 폴더, PhotonView 포함)
+### 13. Photon PUN 2 로비 시스템 (방 브라우저 + 준비 시스템)
+- **Main Panel**: 닉네임 입력 → 방 만들기 / 방 목록 참가 / 연습 모드 선택
+- **CreateRoom Panel**: 방 제목 입력 + 최대 인원(2~4명) 선택
+- **Room Panel**: 플레이어 목록 + Ready 상태 표시 + 방장 시작 버튼
+- **방장 시작 방식**: 전원 준비 완료 + 최소 2명 충족 시 방장이 게임 시작
+- **연습 모드**: `PhotonNetwork.OfflineMode`로 혼자서 즉시 게임 진입
+- **실시간 방 목록**: Photon 로비에서 delta 업데이트로 자동 갱신
+- Custom Properties(`isReady`, `startTime`, `roomName`)로 상태 동기화
 
 ### 14. 멀티플레이어 네트워크 동기화
 - PlayerController/PlayerShooter: `photonView.IsMine`으로 로컬/원격 플레이어 완전 분리
 - MonkeyHealth: `TakeDamageNetwork()` RPC → 피격자 Owner에게만 데미지 전달 (HP 일관성 보장)
 - ScoreManager: `RecordKillNetwork()` RPC → 전 클라이언트 킬피드 브로드캐스트
 - PaintProjectile: 로컬 생성/파괴, 충돌 시 데미지만 RPC 전달 (FPS 표준 아키텍처)
-- NetworkManager: 스폰 후 닉네임/HUD/ScoreManager 자동 등록
-- 모든 네트워크 코드에 `PhotonNetwork.IsConnected` 폴백 → 로컬 테스트 호환
+- NetworkManager: 스폰 후 닉네임/HUD/ScoreManager 자동 등록 + OfflineMode 호환
+- `AutomaticallySyncScene` + `PhotonNetwork.LoadLevel`로 전원 동시 씬 전환
 
 ---
 
@@ -130,7 +134,8 @@
 
 ## 📌 앞으로 할 것
 
-- 2인 빌드 테스트 (로비→게임→이동/사격/킬/리스폰 전 과정 검증)
+- **2인 빌드 테스트** (로비 방 생성 → 준비 → 동시 시작 → 타이머 일치 검증)
+- 뼈 히트박스 콜라이더 크기 실전 튜닝
 - 페인트 데칼/발자국 네트워크 동기화
 - 캐릭터 스킨/컬러 선택 시스템
 - BGM 및 킬 달성 특수 사운드 연출

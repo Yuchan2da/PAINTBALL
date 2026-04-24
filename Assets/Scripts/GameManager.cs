@@ -1,5 +1,7 @@
 using UnityEngine;
 using System;
+using Photon.Pun;
+using ExitGames.Client.Photon;
 
 /// <summary>
 /// 게임 흐름 관리 싱글톤 (상태 머신 기반).
@@ -18,6 +20,9 @@ using System;
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
+
+    // ── 상수 ────────────────────────────────────────────────────────
+    private const string PROP_START_TIME = "startTime";
 
     // ── 게임 상태 enum ──────────────────────────────────────────────
     public enum GameState
@@ -66,6 +71,12 @@ public class GameManager : MonoBehaviour
     // ── 내부 ────────────────────────────────────────────────────────
     private float gameOverTimer;
 
+    /// <summary>
+    /// Photon 서버 시간 기준 플레이 시작 시각.
+    /// 모든 클라이언트가 동일한 남은 시간을 계산하는 데 사용.
+    /// </summary>
+    private double networkStartTime = -1;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -78,8 +89,18 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // 로컬 모드에서는 씬 로드 즉시 게임 시작
-        // 멀티플레이 적용 시 이 부분을 룸 접속 후 호출로 변경
+        // Photon 네트워크: Room에 저장된 startTime이 있으면 동기화 시작
+        if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode
+            && PhotonNetwork.CurrentRoom != null)
+        {
+            object startTimeObj;
+            if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(PROP_START_TIME, out startTimeObj))
+            {
+                networkStartTime = (double)startTimeObj;
+            }
+        }
+
+        // 게임 시작 (카운트다운 → 플레이)
         StartGame();
     }
 
@@ -140,7 +161,18 @@ public class GameManager : MonoBehaviour
 
     void HandlePlaying()
     {
-        RemainingTime -= Time.deltaTime;
+        // Photon 네트워크 동기화: 서버 시간 기준으로 남은 시간 계산
+        if (networkStartTime > 0 && PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
+        {
+            // 카운트다운 시간도 포함하여 계산
+            double elapsed = PhotonNetwork.Time - networkStartTime - countdownDuration;
+            RemainingTime = Mathf.Max(0f, roundDuration - (float)elapsed);
+        }
+        else
+        {
+            // 오프라인/연습 모드: 로컬 타이머
+            RemainingTime -= Time.deltaTime;
+        }
 
         if (RemainingTime <= 0f)
         {
@@ -155,8 +187,17 @@ public class GameManager : MonoBehaviour
 
         if (gameOverTimer <= 0f)
         {
-            // 결과 표시 후 자동으로 새 라운드 시작
-            StartGame();
+            // 멀티플레이: 로비로 복귀
+            if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
+            {
+                PhotonNetwork.LeaveRoom();
+                UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
+            }
+            else
+            {
+                // 연습 모드: 자동으로 새 라운드 시작
+                StartGame();
+            }
         }
     }
 
