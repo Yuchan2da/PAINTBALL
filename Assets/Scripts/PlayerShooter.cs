@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections;
 using Photon.Pun;
+using Photon.Realtime;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// 1인칭 사격 처리 스크립트.
@@ -11,7 +13,7 @@ using Photon.Pun;
 /// Player의 Head/Body도 Hitbox 레이어이므로, 자기 총알이 자기 히트박스에 맞을 수 있다.
 /// → Fire()에서 Physics.IgnoreCollision으로 자기 히트박스와의 물리 충돌을 차단한다.
 /// </summary>
-public class PlayerShooter : MonoBehaviourPun
+public class PlayerShooter : MonoBehaviourPunCallbacks
 {
     [Header("사격 설정")]
     public Transform firePoint;
@@ -60,6 +62,9 @@ public class PlayerShooter : MonoBehaviourPun
     /// </summary>
     [HideInInspector] public bool isLocalPlayer = true;
 
+    // Photon Custom Properties 키
+    private const string PROP_TEAM_COLOR = "tc";
+
     void Start()
     {
         // Photon IsMine으로 로컬/원격 분리 (OfflineMode에서도 정상 동작)
@@ -72,6 +77,57 @@ public class PlayerShooter : MonoBehaviourPun
         // Inspector 미연결 시 자동 탐색
         if (playerCamera == null)
             playerCamera = GetComponentInChildren<Camera>();
+
+        // ── teamColor 네트워크 동기화 ──
+        if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode && photonView != null)
+        {
+            if (photonView.IsMine)
+            {
+                // 로컬: 내 teamColor를 Custom Properties로 전송
+                SyncTeamColorToNetwork();
+            }
+            else
+            {
+                // 원격: 상대방의 Custom Properties에서 teamColor 읽기
+                ReadTeamColorFromNetwork();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 로컬 플레이어의 teamColor를 Photon Custom Properties로 전송.
+    /// </summary>
+    void SyncTeamColorToNetwork()
+    {
+        float[] c = { teamColor.r, teamColor.g, teamColor.b, teamColor.a };
+        Hashtable props = new Hashtable { { PROP_TEAM_COLOR, c } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 원격 플레이어의 Custom Properties에서 teamColor를 읽어온다.
+    /// </summary>
+    void ReadTeamColorFromNetwork()
+    {
+        if (photonView.Owner == null) return;
+        object val;
+        if (photonView.Owner.CustomProperties.TryGetValue(PROP_TEAM_COLOR, out val))
+        {
+            float[] c = (float[])val;
+            teamColor = new Color(c[0], c[1], c[2], c[3]);
+        }
+    }
+
+    /// <summary>
+    /// 플레이어 프로퍼티 변경 시 호출. 원격 플레이어의 teamColor 갱신.
+    /// </summary>
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        if (photonView == null || photonView.Owner != targetPlayer) return;
+        if (!changedProps.ContainsKey(PROP_TEAM_COLOR)) return;
+
+        float[] c = (float[])changedProps[PROP_TEAM_COLOR];
+        teamColor = new Color(c[0], c[1], c[2], c[3]);
     }
 
     /// <summary>

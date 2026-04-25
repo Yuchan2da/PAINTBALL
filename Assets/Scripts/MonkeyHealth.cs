@@ -165,7 +165,30 @@ public class MonkeyHealth : MonoBehaviourPun
                 ScoreManager.Instance.RecordKill(lastAttackerName, gameObject.name, lastWasHeadshot);
         }
 
+        // 네트워크: 원격 클라이언트에도 사망 연출 전송
+        if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
+            photonView.RPC(nameof(RPC_RemoteDie), RpcTarget.Others);
+
         StartCoroutine(DeathRoutine());
+    }
+
+    /// <summary>
+    /// 원격 클라이언트에서 수신: 사망 연출 (투명화 해제 + 넘어지는 애니메이션).
+    /// 데스캠/조작잠금은 로컬에서만 필요하므로 여기서는 시각적 요소만 처리.
+    /// </summary>
+    [PunRPC]
+    void RPC_RemoteDie()
+    {
+        // 1) 정체 노출 (100% 불투명)
+        if (paintReceiver != null)
+            paintReceiver.SetReveal(1f);
+
+        // 2) 사망 애니메이션
+        if (animator != null)
+            animator.SetTrigger(AnimDie);
+
+        // 3) HP 0으로 설정 (IsDead 판정용)
+        CurrentHp = 0;
     }
 
     IEnumerator DeathRoutine()
@@ -309,6 +332,31 @@ public class MonkeyHealth : MonoBehaviourPun
 
         // 6) 조작 활성화 (마지막에 풀어야 안전)
         SetInputEnabled(true);
+
+        // 7) 네트워크: 원격 클라이언트에도 리스폰 연출 전송
+        if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
+            photonView.RPC(nameof(RPC_RemoteRespawn), RpcTarget.Others);
+    }
+
+    /// <summary>
+    /// 원격 클라이언트에서 수신: 리스폰 연출 (투명화 복원 + 애니메이션 리셋).
+    /// </summary>
+    [PunRPC]
+    void RPC_RemoteRespawn()
+    {
+        // HP 복구 (IsDead 해제)
+        CurrentHp = maxHp;
+
+        // 페인트 초기화 (깨끗한 몸 + 스텔스 복원)
+        if (paintReceiver != null)
+            paintReceiver.ClearPaintMap();
+
+        // 애니메이션 리셋
+        if (animator != null)
+        {
+            animator.ResetTrigger(AnimDie);
+            animator.SetTrigger(AnimRespawn);
+        }
     }
 
     // ── 유틸리티 ──────────────────────────────────────────────────
