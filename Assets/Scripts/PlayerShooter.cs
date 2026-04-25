@@ -61,8 +61,8 @@ public class PlayerShooter : MonoBehaviourPun
 
     void Start()
     {
-        // Photon 연결 시 IsMine으로 로컬/원격 분리
-        if (PhotonNetwork.IsConnected && photonView != null)
+        // Photon IsMine으로 로컬/원격 분리 (OfflineMode에서도 정상 동작)
+        if (photonView != null)
             isLocalPlayer = photonView.IsMine;
 
         CurrentAmmo = maxAmmo;

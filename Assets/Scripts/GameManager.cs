@@ -1,7 +1,10 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using Photon.Pun;
+using Photon.Realtime;
 using ExitGames.Client.Photon;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// 게임 흐름 관리 싱글톤 (상태 머신 기반).
@@ -17,7 +20,7 @@ using ExitGames.Client.Photon;
 /// - MonkeyHealth, PlayerController 등은 GameManager의 상태를 읽고 자신의 역할만 수행.
 /// - 추후 Photon 적용 시 서버가 상태 전이를 통제하고 클라이언트가 따르는 구조로 전환.
 /// </summary>
-public class GameManager : MonoBehaviour
+public class GameManager : MonoBehaviourPunCallbacks
 {
     public static GameManager Instance { get; private set; }
 
@@ -89,7 +92,27 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // Photon 네트워크: Room에 저장된 startTime이 있으면 동기화 시작
+        // Photon 네트워크: Room에 저장된 startTime으로 동기화
+        TryReadStartTime();
+
+        // startTime을 아직 못 읽었으면 프로퍼티 도착 대기
+        if (networkStartTime < 0 && PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
+        {
+            StartCoroutine(WaitForStartTime());
+            return; // StartGame은 코루틴에서 호출
+        }
+
+        // 게임 시작 (카운트다운 → 플레이)
+        StartGame();
+    }
+
+    /// <summary>
+    /// Room CustomProperties에서 startTime을 읽는 시도.
+    /// SetCustomProperties와 LoadLevel이 거의 동시에 호출되면
+    /// 비-방장 클라이언트에서 아직 프로퍼티가 도착하지 않을 수 있다.
+    /// </summary>
+    private void TryReadStartTime()
+    {
         if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode
             && PhotonNetwork.CurrentRoom != null)
         {
@@ -97,11 +120,41 @@ public class GameManager : MonoBehaviour
             if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(PROP_START_TIME, out startTimeObj))
             {
                 networkStartTime = (double)startTimeObj;
+                Debug.Log($"[GameManager] startTime 동기화 완료: {networkStartTime}");
             }
         }
+    }
 
-        // 게임 시작 (카운트다운 → 플레이)
+    /// <summary>
+    /// startTime 프로퍼티가 도착할 때까지 최대 3초 대기.
+    /// </summary>
+    private IEnumerator WaitForStartTime()
+    {
+        float waited = 0f;
+        while (networkStartTime < 0 && waited < 3f)
+        {
+            TryReadStartTime();
+            yield return new WaitForSeconds(0.1f);
+            waited += 0.1f;
+        }
+
+        if (networkStartTime < 0)
+            Debug.LogWarning("[GameManager] startTime 수신 실패, 로컬 타이머 사용");
+
         StartGame();
+    }
+
+    /// <summary>
+    /// Room 프로퍼티가 변경될 때 Photon이 자동 호출.
+    /// Start()보다 늦게 도착하는 startTime을 이 콜백에서 수신.
+    /// </summary>
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    {
+        if (propertiesThatChanged.ContainsKey(PROP_START_TIME))
+        {
+            networkStartTime = (double)propertiesThatChanged[PROP_START_TIME];
+            Debug.Log($"[GameManager] startTime 프로퍼티 수신: {networkStartTime}");
+        }
     }
 
     void Update()

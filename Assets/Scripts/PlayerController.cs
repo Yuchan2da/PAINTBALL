@@ -77,8 +77,8 @@ public class PlayerController : MonoBehaviourPun
     {
         characterController = GetComponent<CharacterController>();
 
-        // Photon 연결 시 IsMine으로 로컬/원격 분리
-        if (PhotonNetwork.IsConnected && photonView != null)
+        // Photon IsMine으로 로컬/원격 분리 (OfflineMode에서도 정상 동작)
+        if (photonView != null)
             isLocalPlayer = photonView.IsMine;
 
         // 카메라/오디오: Inspector 미연결 시 자동 탐색
@@ -106,6 +106,12 @@ public class PlayerController : MonoBehaviourPun
                 var listener = cameraTransform.GetComponent<AudioListener>();
                 if (listener != null) listener.enabled = false;
             }
+
+            // 원격 플레이어: CharacterController 비활성화
+            // PhotonTransformView가 위치를 동기화하므로,
+            // CC가 활성화되어 있으면 위치를 덮어쓰는 충돌이 발생한다.
+            if (characterController != null)
+                characterController.enabled = false;
         }
 
         // 패널티 기준점을 시작 위치로 초기화
