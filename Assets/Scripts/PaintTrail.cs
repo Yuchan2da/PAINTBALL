@@ -77,7 +77,9 @@ public class PaintTrail : MonoBehaviour
             return characterController.isGrounded;
 
         // CC가 비활성화된 원격 플레이어: 발밑 Raycast
-        float rayLength = 0.3f;
+        // CC center=(0,0,0), height=2 → transform.position은 캐릭터 중간높이(≈지면+1m)
+        // 따라서 지면까지 약 1m의 Raycast가 필요
+        float rayLength = 1.5f;
         Vector3 origin = transform.position + Vector3.up * 0.1f;
         return Physics.Raycast(origin, Vector3.down, rayLength);
     }
@@ -103,8 +105,19 @@ public class PaintTrail : MonoBehaviour
         }
         else
         {
-            // 원격 플레이어: CC 없이 발밑 근사치
-            footPos = transform.position;
+            // 원격 플레이어: CC가 비활성화되어 있지만, CC 설정값은 유효
+            // CC center=(0,0,0), height=2 → 발밑 = transform.position - (0, height/2, 0)
+            if (characterController != null)
+            {
+                float halfHeight = characterController.height / 2f;
+                footPos = transform.position
+                    + characterController.center
+                    - new Vector3(0f, halfHeight - 0.02f, 0f);
+            }
+            else
+            {
+                footPos = transform.position;
+            }
         }
 
         decal.transform.position = footPos;

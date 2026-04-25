@@ -102,7 +102,8 @@ public class FootprintManager : MonoBehaviour
             return characterController.isGrounded;
 
         // CC가 비활성화된 원격 플레이어: 발밑 Raycast
-        float rayLength = 0.3f;
+        // CC center=(0,0,0), height=2 → transform.position은 캐릭터 중간높이(≈지면+1m)
+        float rayLength = 1.5f;
         Vector3 origin = transform.position + Vector3.up * 0.1f;
         return Physics.Raycast(origin, Vector3.down, rayLength);
     }
@@ -119,7 +120,14 @@ public class FootprintManager : MonoBehaviour
                 + characterController.center
                 - new Vector3(0f, halfHeight - 0.02f, 0f);
         }
-        // 원격 플레이어: CC 없이 발밑 근사치
+        // 원격 플레이어: CC가 비활성화되어 있지만 CC 설정값은 유효
+        if (characterController != null)
+        {
+            float halfHeight = characterController.height / 2f;
+            return transform.position
+                + characterController.center
+                - new Vector3(0f, halfHeight - 0.02f, 0f);
+        }
         return transform.position;
     }
 

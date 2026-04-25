@@ -179,13 +179,23 @@ public class MonkeyHealth : MonoBehaviourPun
     [PunRPC]
     void RPC_RemoteDie()
     {
+        Debug.Log($"[RPC_RemoteDie] {gameObject.name} 원격 사망 연출 수신! paintReceiver={paintReceiver != null}, animator={animator != null}");
+
+        // animator가 아직 캐싱 안 되었을 수 있음 (Start() 순서 문제)
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+
         // 1) 정체 노출 (100% 불투명)
         if (paintReceiver != null)
             paintReceiver.SetReveal(1f);
+        else
+            Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: paintReceiver가 null!");
 
         // 2) 사망 애니메이션
         if (animator != null)
             animator.SetTrigger(AnimDie);
+        else
+            Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: animator가 null!");
 
         // 3) HP 0으로 설정 (IsDead 판정용)
         CurrentHp = 0;
@@ -344,6 +354,12 @@ public class MonkeyHealth : MonoBehaviourPun
     [PunRPC]
     void RPC_RemoteRespawn()
     {
+        Debug.Log($"[RPC_RemoteRespawn] {gameObject.name} 원격 리스폰 연출 수신!");
+
+        // animator fallback
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+
         // HP 복구 (IsDead 해제)
         CurrentHp = maxHp;
 
