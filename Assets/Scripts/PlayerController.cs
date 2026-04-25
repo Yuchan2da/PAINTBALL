@@ -44,9 +44,10 @@ public class PlayerController : MonoBehaviourPun
     // ── 외부 제어 (사망/리스폰 + 멀티플레이) ──────────────────────
     /// <summary>
     /// false로 설정하면 이동, 시점 회전, 점프가 모두 잠긴다.
-    /// MonkeyHealth에서 사망/부활 시 토글한다.
+    /// 기본값 false: 스폰 직후에는 잠김 상태이며,
+    /// GameManager가 Playing 상태로 전환할 때 활성화한다.
     /// </summary>
-    [HideInInspector] public bool inputEnabled = true;
+    [HideInInspector] public bool inputEnabled = false;
 
     /// <summary>
     /// 로컬 플레이어 여부. Photon 연동 시 photonView.IsMine으로 교체.
