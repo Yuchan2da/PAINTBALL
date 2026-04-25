@@ -134,16 +134,25 @@ public class PaintReceiver : MonoBehaviour
     /// <param name="teamColor">발사한 팀의 색상</param>
     public void PaintAt(Vector3 worldHitPoint, Vector3 hitNormal, Color teamColor)
     {
-        if (paintCollider == null || stampMaterial == null) return;
+        if (paintCollider == null || stampMaterial == null)
+        {
+            Debug.LogWarning($"[PaintReceiver] PaintAt 실패: paintCollider={paintCollider != null}, stampMaterial={stampMaterial != null}");
+            return;
+        }
 
         // 1단계: 현재 포즈의 메쉬를 베이크하여 MeshCollider에 반영
         UpdatePaintColliderMesh();
 
         // 2단계: 충돌 지점에서 메쉬로 Raycast하여 UV 좌표 획득
         Vector2 uv;
-        if (!TryGetUVAtPoint(worldHitPoint, hitNormal, out uv)) return;
+        if (!TryGetUVAtPoint(worldHitPoint, hitNormal, out uv))
+        {
+            Debug.LogWarning($"[PaintReceiver] UV 조회 실패: {gameObject.name}, hitPoint={worldHitPoint}, normal={hitNormal}");
+            return;
+        }
 
         // 3단계: 해당 UV에 페인트 스플랫 그리기
+        Debug.Log($"[PaintReceiver] UV 페인트 성공: {gameObject.name}, uv={uv}");
         DrawSplat(uv, teamColor);
     }
 
@@ -247,7 +256,15 @@ public class PaintReceiver : MonoBehaviour
     /// </summary>
     public void SetReveal(float amount)
     {
-        if (targetRenderer == null || mpb == null) return;
+        if (targetRenderer == null) return;
+
+        // mpb가 아직 초기화 안 된 경우 (Start() 전이거나 원격 플레이어)
+        if (mpb == null)
+        {
+            mpb = new MaterialPropertyBlock();
+            targetRenderer.GetPropertyBlock(mpb);
+        }
+
         mpb.SetFloat(PropRevealAmount, amount);
         targetRenderer.SetPropertyBlock(mpb);
     }

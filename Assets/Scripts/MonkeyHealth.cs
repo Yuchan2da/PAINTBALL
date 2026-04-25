@@ -166,8 +166,12 @@ public class MonkeyHealth : MonoBehaviourPun
         }
 
         // 네트워크: 원격 클라이언트에도 사망 연출 전송
+        Debug.Log($"[HandleDeath] RPC조건: IsConnected={PhotonNetwork.IsConnected}, photonView={photonView != null}, IsMine={photonView?.IsMine}");
         if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
+        {
+            Debug.Log($"[HandleDeath] RPC_RemoteDie 전송! viewID={photonView.ViewID}");
             photonView.RPC(nameof(RPC_RemoteDie), RpcTarget.Others);
+        }
 
         StartCoroutine(DeathRoutine());
     }
@@ -185,19 +189,41 @@ public class MonkeyHealth : MonoBehaviourPun
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
 
-        // 1) 정체 노출 (100% 불투명)
-        if (paintReceiver != null)
-            paintReceiver.SetReveal(1f);
-        else
-            Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: paintReceiver가 null!");
+        // paintReceiver가 캐싱 안 되었을 수 있음
+        if (paintReceiver == null)
+            paintReceiver = GetComponent<PaintReceiver>();
 
-        // 2) 사망 애니메이션
+        // 1) 정체 노출 (100% 불투명) — 원격에서 캐릭터가 보여야 사망 연출이 보임
+        if (paintReceiver != null)
+        {
+            paintReceiver.SetReveal(1f);
+            Debug.Log($"[RPC_RemoteDie] {gameObject.name}: SetReveal(1) 호출 완료");
+        }
+        else
+        {
+            // PaintReceiver가 없어도 SkinnedMeshRenderer를 직접 불투명으로 만들기
+            Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: paintReceiver가 null! 직접 renderer 처리 시도");
+            var smr = GetComponentInChildren<SkinnedMeshRenderer>();
+            if (smr != null)
+            {
+                var block = new MaterialPropertyBlock();
+                smr.GetPropertyBlock(block);
+                block.SetFloat("_RevealAmount", 1f);
+                smr.SetPropertyBlock(block);
+            }
+        }
+
+        // 2) 사망 애니메이션 — CrossFade로 직접 상태 전환 (Trigger보다 안정적)
         if (animator != null)
-            animator.SetTrigger(AnimDie);
+        {
+            // CrossFade는 상태 이름 해시로 직접 전환 → Trigger 타이밍 문제 없음
+            animator.Play("Die", 0, 0f);
+            Debug.Log($"[RPC_RemoteDie] {gameObject.name}: animator.Play('Die') 호출 완료");
+        }
         else
             Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: animator가 null!");
 
-        // 3) HP 0으로 설정 (IsDead 판정용)
+        // 3) HP 0으로 설정 (IsDead 판정용 — 트레일/발자국 생성 중지)
         CurrentHp = 0;
     }
 
@@ -356,9 +382,11 @@ public class MonkeyHealth : MonoBehaviourPun
     {
         Debug.Log($"[RPC_RemoteRespawn] {gameObject.name} 원격 리스폰 연출 수신!");
 
-        // animator fallback
+        // fallback
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+        if (paintReceiver == null)
+            paintReceiver = GetComponent<PaintReceiver>();
 
         // HP 복구 (IsDead 해제)
         CurrentHp = maxHp;
@@ -367,11 +395,11 @@ public class MonkeyHealth : MonoBehaviourPun
         if (paintReceiver != null)
             paintReceiver.ClearPaintMap();
 
-        // 애니메이션 리셋
+        // 애니메이션 리셋 — 직접 Blend Tree(Idle)로 전환
         if (animator != null)
         {
             animator.ResetTrigger(AnimDie);
-            animator.SetTrigger(AnimRespawn);
+            animator.Play("Blend Tree", 0, 0f);
         }
     }
 
