@@ -113,6 +113,20 @@ public class PlayerController : MonoBehaviourPun
             // CC가 활성화되어 있으면 위치를 덮어쓰는 충돌이 발생한다.
             if (characterController != null)
                 characterController.enabled = false;
+
+            // ── 원격 플레이어: LocalPlayer → Default 레이어 전환 ──
+            // 프리팹에서 Chibi_Monkey 등이 LocalPlayer 레이어(7)로 설정되어 있는데,
+            // 카메라의 cullingMask에서 LocalPlayer를 제외하므로 원격 캐릭터가 안 보인다.
+            // 원격 플레이어는 Default 레이어로 바꿔야 상대방 화면에 보인다.
+            int localPlayerLayer = LayerMask.NameToLayer("LocalPlayer");
+            if (localPlayerLayer >= 0)
+            {
+                foreach (var t in GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.gameObject.layer == localPlayerLayer)
+                        t.gameObject.layer = 0; // Default
+                }
+            }
         }
 
         // 패널티 기준점을 시작 위치로 초기화
