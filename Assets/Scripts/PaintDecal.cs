@@ -80,6 +80,9 @@ public class PaintDecal : MonoBehaviour
 
     void ReturnToPool()
     {
+        // 본에 붙어있었을 수 있으므로 부모 해제
+        transform.SetParent(null, false);
+
         if (ObjectPoolManager.Instance != null)
             ObjectPoolManager.Instance.ReturnDecal(gameObject);
         else

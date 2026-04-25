@@ -128,32 +128,103 @@ public class PaintReceiver : MonoBehaviour
     /// <summary>
     /// 월드 좌표 충돌 지점에 페인트를 칠한다.
     /// PaintProjectile에서 호출된다.
+    /// 
+    /// [방식] DecalProjector를 히트 본의 자식으로 붙여서,
+    /// 캐릭터가 움직여도 데칼이 따라다니게 한다.
+    /// 벽/바닥 데칼과 동일한 비주얼로 통일.
     /// </summary>
-    /// <param name="worldHitPoint">총알이 맞은 월드 좌표</param>
-    /// <param name="hitNormal">충돌 표면의 법선 방향</param>
-    /// <param name="teamColor">발사한 팀의 색상</param>
     public void PaintAt(Vector3 worldHitPoint, Vector3 hitNormal, Color teamColor)
     {
-        if (paintCollider == null || stampMaterial == null)
+        // 가장 가까운 본(히트박스 콜라이더가 붙은 본)을 찾아 데칼의 부모로 설정
+        Transform nearestBone = FindNearestBone(worldHitPoint);
+        if (nearestBone == null)
         {
-            Debug.LogWarning($"[PaintReceiver] PaintAt 실패: paintCollider={paintCollider != null}, stampMaterial={stampMaterial != null}");
+            Debug.LogWarning($"[PaintReceiver] 가까운 본을 찾을 수 없음: {gameObject.name}");
             return;
         }
 
-        // 1단계: 현재 포즈의 메쉬를 베이크하여 MeshCollider에 반영
-        UpdatePaintColliderMesh();
+        SpawnBodyDecal(worldHitPoint, hitNormal, teamColor, nearestBone);
 
-        // 2단계: 충돌 지점에서 메쉬로 Raycast하여 UV 좌표 획득
-        Vector2 uv;
-        if (!TryGetUVAtPoint(worldHitPoint, hitNormal, out uv))
+        // UV 스플랫도 유지 (paintMap에 누적 — SetReveal 시 사용)
+        if (paintCollider != null && stampMaterial != null)
         {
-            Debug.LogWarning($"[PaintReceiver] UV 조회 실패: {gameObject.name}, hitPoint={worldHitPoint}, normal={hitNormal}");
-            return;
+            UpdatePaintColliderMesh();
+            Vector2 uv;
+            if (TryGetUVAtPoint(worldHitPoint, hitNormal, out uv))
+                DrawSplat(uv, teamColor);
+        }
+    }
+
+    /// <summary>
+    /// 히트 본의 자식으로 DecalProjector 데칼을 생성한다.
+    /// ObjectPoolManager에서 데칼을 가져오되, 부모를 본으로 설정.
+    /// </summary>
+    void SpawnBodyDecal(Vector3 worldPoint, Vector3 normal, Color color, Transform bone)
+    {
+        if (ObjectPoolManager.Instance == null) return;
+
+        GameObject decal = ObjectPoolManager.Instance.GetDecal();
+
+        // 본의 자식으로 붙이기 (캐릭터와 함께 움직임)
+        decal.transform.SetParent(bone, true);
+
+        // 위치: 충돌 지점, 표면에서 살짝 띄움
+        decal.transform.position = worldPoint + normal * 0.005f;
+
+        // 회전: 법선 반대 방향으로 투영
+        decal.transform.rotation = Quaternion.LookRotation(-normal, Vector3.up);
+
+        // 크기: 캐릭터 몸에 맞게 작게 (벽 데칼보다 작음)
+        var projector = decal.GetComponent<UnityEngine.Rendering.Universal.DecalProjector>();
+        if (projector != null)
+        {
+            projector.size = new Vector3(0.15f, 0.15f, 0.1f);
         }
 
-        // 3단계: 해당 UV에 페인트 스플랫 그리기
-        Debug.Log($"[PaintReceiver] UV 페인트 성공: {gameObject.name}, uv={uv}");
-        DrawSplat(uv, teamColor);
+        // 팀 컬러 적용
+        var paintDecal = decal.GetComponent<PaintDecal>();
+        if (paintDecal != null)
+            paintDecal.SetColor(color);
+
+        Debug.Log($"[PaintReceiver] 바디 데칼 생성: {gameObject.name}, bone={bone.name}");
+    }
+
+    /// <summary>
+    /// 충돌 지점에서 가장 가까운 히트박스 본을 찾는다.
+    /// </summary>
+    Transform FindNearestBone(Vector3 worldPoint)
+    {
+        int hitboxLayer = LayerMask.NameToLayer("Hitbox");
+        Transform nearest = null;
+        float minDist = float.MaxValue;
+
+        foreach (var col in GetComponentsInChildren<Collider>(true))
+        {
+            if (col.gameObject.layer != hitboxLayer) continue;
+            float dist = Vector3.Distance(col.transform.position, worldPoint);
+            if (dist < minDist)
+            {
+                minDist = dist;
+                nearest = col.transform;
+            }
+        }
+
+        // fallback: 히트박스 없으면 가장 가까운 본
+        if (nearest == null && targetRenderer is SkinnedMeshRenderer smr)
+        {
+            foreach (var bone in smr.bones)
+            {
+                if (bone == null) continue;
+                float dist = Vector3.Distance(bone.position, worldPoint);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    nearest = bone;
+                }
+            }
+        }
+
+        return nearest;
     }
 
     /// <summary>
