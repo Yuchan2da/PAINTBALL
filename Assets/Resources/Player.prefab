@@ -5631,6 +5631,10 @@ PrefabInstance:
       propertyPath: m_TagString
       value: Body
       objectReference: {fileID: 0}
+    - target: {fileID: 7177751388376036883, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 7324366557673787571, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
       propertyPath: m_Layer
       value: 7
@@ -5799,7 +5803,7 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 3657730749069081779}
     - targetCorrespondingSourceObject: {fileID: 2020844804265515341, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
-      insertIndex: -1
+      insertIndex: 1
       addedObject: {fileID: 5097605608294204690}
     - targetCorrespondingSourceObject: {fileID: 132153362343153464, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
       insertIndex: -1
@@ -5886,10 +5890,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.22
-  m_Height: 0.45
+  m_Radius: 0.21367615
+  m_Height: 0.49631014
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0.006323844, y: -0.000000016169341, z: -4.4355608e-10}
 --- !u!1 &4005500893957405383 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 132153362343153464, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -5980,10 +5984,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.05
-  m_Height: 0.25
+  m_Radius: 0.083196305
+  m_Height: 0.5166591
   m_Direction: 0
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0.13333018, y: -0.0210083, z: 0.01218793}
 --- !u!1 &6399907220745939690 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7967690908504530709, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -6009,9 +6013,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.08
-  m_Height: 0.32
+  m_Height: 0.33583874
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: -6.1136396e-10, y: 0.007919356, z: 2.7640945e-10}
 --- !u!1 &6730959848489446255 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7722205851399757456, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -6036,10 +6040,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.08
+  m_Radius: 0.09111757
   m_Height: 0.32
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0.011117578, y: 8.1890517e-10, z: 8.844584e-10}
 --- !u!1 &6977383050986430778 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6239528333133075653, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -6064,10 +6068,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.18
-  m_Height: 0.3
+  m_Radius: 0.20336957
+  m_Height: 0.4067392
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: -0.023369584, y: -0.0000000014966152, z: 0.0000000024948759}
 --- !u!1 &7821178284538390927 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6541915142029417584, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -6120,10 +6124,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.05
-  m_Height: 0.25
+  m_Radius: 0.07861871
+  m_Height: 0.48894125
   m_Direction: 0
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: -0.11947083, y: 0.028617805, z: 0.0000000016986353}
 --- !u!1 &8996711206195987692 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5375424609692152083, guid: d2d3d08afa80216409ebf3bd241ea899, type: 3}
@@ -6148,5 +6152,5 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.14
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Radius: 0.39948988
+  m_Center: {x: -0.40710545, y: -0.00000017101688, z: 0.00000013726559}

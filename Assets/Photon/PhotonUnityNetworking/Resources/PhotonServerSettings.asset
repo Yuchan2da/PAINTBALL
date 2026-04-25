@@ -41,6 +41,10 @@ MonoBehaviour:
   - RespawnSpaceship
   - RPC_RecordKill
   - RPC_TakeDamage
+  - RPC_PaintBody
+  - RPC_SpawnDecal
+  - RPC_RemoteDie
+  - RPC_RemoteRespawn
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
