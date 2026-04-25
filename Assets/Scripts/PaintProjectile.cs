@@ -1,5 +1,6 @@
 using UnityEngine;
 using Photon.Pun;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// 물리 기반 페인트 총알.
@@ -23,6 +24,12 @@ public class PaintProjectile : MonoBehaviour
     [HideInInspector] public Color teamColor = Color.red;
     [HideInInspector] public Transform ownerRoot;
     [HideInInspector] public string shooterName;
+
+    /// <summary>
+    /// 사격자의 PhotonView 연결. 페인트 RPC 전송에 사용.
+    /// PlayerShooter.Fire()에서 설정한다.
+    /// </summary>
+    [HideInInspector] public PhotonView shooterPhotonView;
 
     [Tooltip("탄착 스플래시 파티클 프리팫 (ObjectPoolManager에서 설정)")]
     [HideInInspector] public GameObject hitSplashPrefab;
@@ -71,7 +78,14 @@ public class PaintProjectile : MonoBehaviour
 
             var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)
+            {
                 paintReceiver.PaintAt(contact.point, contact.normal, teamColor);
+
+                // 네트워크: 다른 클라이언트에도 UV 페인트 동기화
+                var targetPV = collision.gameObject.GetComponentInParent<PhotonView>();
+                if (targetPV != null)
+                    SyncBodyPaintOverNetwork(contact.point, contact.normal, targetPV.ViewID);
+            }
 
             // ── 피격 사운드 ──
             if (SFXManager.Instance != null)
@@ -85,9 +99,13 @@ public class PaintProjectile : MonoBehaviour
         }
 
         // ── 모든 표면 (바닥, 벽, 상자, 드럼통 등) → 데칼 + 스플래시 ──
-        SpawnDecal(collision);
-        ContactPoint cp = collision.GetContact(0);
-        SpawnHitSplash(cp.point, cp.normal);
+        ContactPoint surfaceContact = collision.GetContact(0);
+        SpawnDecal(surfaceContact.point, surfaceContact.normal);
+        SpawnHitSplash(surfaceContact.point, surfaceContact.normal);
+
+        // 네트워크: 다른 클라이언트에도 데칼 생성
+        SyncDecalOverNetwork(surfaceContact.point, surfaceContact.normal);
+
         ReturnToPool();
     }
 
@@ -95,24 +113,56 @@ public class PaintProjectile : MonoBehaviour
     /// 표면에 페인트 데칼을 배치한다.
     /// DecalProjector를 사용하여 모서리에도 자연스럽게 투영된다.
     /// </summary>
-    void SpawnDecal(Collision collision)
+    void SpawnDecal(Vector3 point, Vector3 normal)
     {
         if (ObjectPoolManager.Instance == null) return;
 
-        ContactPoint contact = collision.GetContact(0);
         GameObject decal = ObjectPoolManager.Instance.GetDecal();
 
         // 위치: 표면에서 살짝 띄워 배치
-        decal.transform.position = contact.point + contact.normal * 0.01f;
+        decal.transform.position = point + normal * 0.01f;
 
         // 회전: DecalProjector는 로컬 Z축 방향으로 투영하므로,
         // 표면 노멀의 반대 방향(-normal)을 forward로 설정
-        decal.transform.rotation = Quaternion.LookRotation(-contact.normal, Vector3.up);
+        decal.transform.rotation = Quaternion.LookRotation(-normal, Vector3.up);
 
         // 팀 컬러 적용
         var paintDecal = decal.GetComponent<PaintDecal>();
         if (paintDecal != null)
             paintDecal.SetColor(teamColor);
+    }
+
+    // ── 네트워크 페인트 동기화 ─────────────────────────────────────
+
+    /// <summary>
+    /// 벽/바닥 데칼을 다른 클라이언트에도 생성.
+    /// </summary>
+    void SyncDecalOverNetwork(Vector3 point, Vector3 normal)
+    {
+        if (shooterPhotonView == null || !PhotonNetwork.IsConnected || PhotonNetwork.OfflineMode)
+            return;
+
+        shooterPhotonView.RPC(
+            nameof(PlayerShooter.RPC_SpawnDecal), RpcTarget.Others,
+            point, normal,
+            new float[] { teamColor.r, teamColor.g, teamColor.b, teamColor.a }
+        );
+    }
+
+    /// <summary>
+    /// 캐릭터 UV 페인트를 다른 클라이언트에도 생성.
+    /// </summary>
+    void SyncBodyPaintOverNetwork(Vector3 hitPoint, Vector3 hitNormal, int targetViewID)
+    {
+        if (shooterPhotonView == null || !PhotonNetwork.IsConnected || PhotonNetwork.OfflineMode)
+            return;
+
+        shooterPhotonView.RPC(
+            nameof(PlayerShooter.RPC_PaintBody), RpcTarget.Others,
+            hitPoint, hitNormal,
+            new float[] { teamColor.r, teamColor.g, teamColor.b, teamColor.a },
+            targetViewID
+        );
     }
 
     /// <summary>

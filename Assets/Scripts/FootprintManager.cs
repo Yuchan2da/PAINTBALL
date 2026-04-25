@@ -10,6 +10,10 @@ using UnityEngine;
 /// 발밑에서 CheckSphere로 Trigger 콜라이더 겹침만 확인한다.
 /// → Raycast가 Floor/Decal 사이에서 씹히는 문제를 원천 차단.
 ///
+/// [네트워크 호환]
+/// 원격 플레이어의 CharacterController는 비활성화되어 IsGrounded를 쓸 수 없으므로,
+/// Raycast 기반 접지 체크를 병행한다.
+///
 /// [최적화]
 /// 매 프레임 검사하지 않고, 이전 발자국에서 0.6m 이상 떨어졌을 때만 1회 실행.
 ///
@@ -33,6 +37,7 @@ public class FootprintManager : MonoBehaviour
     private PlayerController playerController;
     private CharacterController characterController;
     private PlayerShooter playerShooter;
+    private MonkeyHealth monkeyHealth;
 
     private Vector3 lastFootprintPos;
     private int paintTriggerMask;
@@ -42,6 +47,7 @@ public class FootprintManager : MonoBehaviour
         playerController = GetComponent<PlayerController>();
         characterController = GetComponent<CharacterController>();
         playerShooter = GetComponent<PlayerShooter>();
+        monkeyHealth = GetComponent<MonkeyHealth>();
 
         lastFootprintPos = transform.position;
 
@@ -52,11 +58,11 @@ public class FootprintManager : MonoBehaviour
 
     void Update()
     {
-        // 조작 잠금 상태(사망)에서는 발자국 생성 안 함
-        if (playerController != null && !playerController.inputEnabled) return;
+        // 사망 상태에서는 발자국 생성 안 함 (원격 플레이어에서도 동작)
+        if (monkeyHealth != null && monkeyHealth.IsDead) return;
 
         // ★ 핵심 방어: 공중에서는 절대 감지하지 않음
-        if (playerController != null && !playerController.IsGrounded) return;
+        if (!CheckGrounded()) return;
 
         // 최적화: 0.6m 이상 이동했을 때만 감지 (Y축 무시)
         float distFromLast = Vector3.Distance(
@@ -85,17 +91,35 @@ public class FootprintManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 접지 여부를 확인한다.
+    /// 로컬 플레이어: CharacterController.isGrounded (정확)
+    /// 원격 플레이어: CC가 비활성화되어 있으므로 Raycast로 체크
+    /// </summary>
+    bool CheckGrounded()
+    {
+        // CC가 활성화된 로컬 플레이어
+        if (characterController != null && characterController.enabled)
+            return characterController.isGrounded;
+
+        // CC가 비활성화된 원격 플레이어: 발밑 Raycast
+        float rayLength = 0.3f;
+        Vector3 origin = transform.position + Vector3.up * 0.1f;
+        return Physics.Raycast(origin, Vector3.down, rayLength);
+    }
+
+    /// <summary>
     /// CharacterController 기반으로 정확한 발바닥 위치를 계산한다.
     /// </summary>
     Vector3 CalculateFootPosition()
     {
-        if (characterController != null)
+        if (characterController != null && characterController.enabled)
         {
             float halfHeight = characterController.height / 2f;
             return transform.position
                 + characterController.center
                 - new Vector3(0f, halfHeight - 0.02f, 0f);
         }
+        // 원격 플레이어: CC 없이 발밑 근사치
         return transform.position;
     }
 

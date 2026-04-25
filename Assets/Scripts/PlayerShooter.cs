@@ -123,9 +123,10 @@ public class PlayerShooter : MonoBehaviourPun
         var pp = bullet.GetComponent<PaintProjectile>();
         if (pp != null)
         {
-            pp.teamColor    = teamColor;
-            pp.ownerRoot    = transform.root;
-            pp.shooterName  = gameObject.name;
+            pp.teamColor         = teamColor;
+            pp.ownerRoot         = transform.root;
+            pp.shooterName       = gameObject.name;
+            pp.shooterPhotonView = photonView; // 페인트 RPC 전송용
         }
 
         // ── 자기 히트박스와 물리 충돌 무시 ──
@@ -180,4 +181,42 @@ public class PlayerShooter : MonoBehaviourPun
         Debug.Log($"재장전 완료! {CurrentAmmo}/{maxAmmo}");
     }
 
+    // ── 네트워크 페인트 동기화 RPC ────────────────────────────────────
+
+    /// <summary>
+    /// 원격 클라이언트에서 수신: 벽/바닥 데칼 생성.
+    /// PaintProjectile.SyncDecalOverNetwork()에서 호출된다.
+    /// </summary>
+    [PunRPC]
+    public void RPC_SpawnDecal(Vector3 point, Vector3 normal, float[] color)
+    {
+        if (ObjectPoolManager.Instance == null) return;
+
+        GameObject decal = ObjectPoolManager.Instance.GetDecal();
+        decal.transform.position = point + normal * 0.01f;
+        decal.transform.rotation = Quaternion.LookRotation(-normal, Vector3.up);
+
+        Color teamCol = new Color(color[0], color[1], color[2], color[3]);
+        var paintDecal = decal.GetComponent<PaintDecal>();
+        if (paintDecal != null)
+            paintDecal.SetColor(teamCol);
+    }
+
+    /// <summary>
+    /// 원격 클라이언트에서 수신: 캐릭터 UV 페인트 생성.
+    /// PaintProjectile.SyncBodyPaintOverNetwork()에서 호출된다.
+    /// </summary>
+    [PunRPC]
+    public void RPC_PaintBody(Vector3 hitPoint, Vector3 hitNormal, float[] color, int targetViewID)
+    {
+        PhotonView targetPV = PhotonView.Find(targetViewID);
+        if (targetPV == null) return;
+
+        var paintReceiver = targetPV.GetComponent<PaintReceiver>();
+        if (paintReceiver != null)
+        {
+            Color teamCol = new Color(color[0], color[1], color[2], color[3]);
+            paintReceiver.PaintAt(hitPoint, hitNormal, teamCol);
+        }
+    }
 }
