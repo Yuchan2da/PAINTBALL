@@ -83,7 +83,7 @@ public class PaintProjectile : MonoBehaviour
             if (paintReceiver != null)
             {
                 Debug.Log($"[PaintProjectile] UV페인트 시도: target={collision.gameObject.name}, point={contact.point}, normal={contact.normal}");
-                paintReceiver.PaintAt(contact.point, contact.normal, teamColor);
+                paintReceiver.PaintAt(contact.point, contact.normal, teamColor, collision.gameObject.tag);
 
                 // 네트워크: 다른 클라이언트에도 UV 페인트 동기화
                 var targetPV = collision.gameObject.GetComponentInParent<PhotonView>();

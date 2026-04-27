@@ -31,17 +31,20 @@ public class PaintReceiver : MonoBehaviour
     [Tooltip("페인트 가장자리 선명도 (1=딱딱, 0.1=부드러움)")]
     public float splatHardness = 0.6f;
 
-    // ── 셰이더 프로퍼티 ID (StringToHash와 동일한 최적화) ──────────
+    // ── 셰이더 프로퍼티 ID ────────────────────────────────────────
     private static readonly int PropPaintMap      = Shader.PropertyToID("_PaintMap");
     private static readonly int PropSplatCenter   = Shader.PropertyToID("_SplatCenter");
     private static readonly int PropSplatRadius   = Shader.PropertyToID("_SplatRadius");
     private static readonly int PropSplatColor    = Shader.PropertyToID("_SplatColor");
     private static readonly int PropSplatHardness = Shader.PropertyToID("_SplatHardness");
+    private static readonly int PropSplatTex      = Shader.PropertyToID("_SplatTex");
+    private static readonly int PropSplatAngle    = Shader.PropertyToID("_SplatAngle");
     private static readonly int PropRevealAmount  = Shader.PropertyToID("_RevealAmount");
 
     // ── 내부 상태 ─────────────────────────────────────────────────
     private RenderTexture paintMap;
     private Material stampMaterial;
+    private Texture2D splatTexture;
     private Mesh bakedMesh;
     private MeshCollider paintCollider;
     private MaterialPropertyBlock mpb;
@@ -84,6 +87,19 @@ public class PaintReceiver : MonoBehaviour
             return;
         }
         stampMaterial = new Material(stampShader);
+
+        // 벽/바닥 데칼과 동일한 PaintSplat 텍스처를 스탬프 마스크로 사용
+        splatTexture = Resources.Load<Texture2D>("PaintSplat");
+        if (splatTexture == null)
+        {
+            // Resources 폴더에 없으면 AssetDatabase에서 직접 로드 시도
+            splatTexture = UnityEngine.Resources.Load<Texture2D>("PaintSplat");
+        }
+
+        if (splatTexture != null)
+            stampMaterial.SetTexture(PropSplatTex, splatTexture);
+        else
+            Debug.LogWarning("[PaintReceiver] PaintSplat 텍스처를 찾을 수 없습니다. 기본 원형이 사용됩니다.");
     }
 
     /// <summary>
@@ -129,64 +145,69 @@ public class PaintReceiver : MonoBehaviour
     /// 월드 좌표 충돌 지점에 페인트를 칠한다.
     /// PaintProjectile에서 호출된다.
     /// 
-    /// [방식] DecalProjector를 히트 본의 자식으로 붙여서,
-    /// 캐릭터가 움직여도 데칼이 따라다니게 한다.
-    /// 벽/바닥 데칼과 동일한 비주얼로 통일.
+    /// [이중 시스템]
+    /// 1) UV 페인트맵: PaintSkin 셰이더가 읽어서 스텔스(투명) 해제용.
+    /// 2) DecalProjector: 벽/바닥과 동일한 자연스러운 페인트 비주얼. 본에 부착.
     /// </summary>
-    public void PaintAt(Vector3 worldHitPoint, Vector3 hitNormal, Color teamColor)
+    public void PaintAt(Vector3 worldHitPoint, Vector3 hitNormal, Color teamColor, string hitTag = "Body")
     {
-        // 가장 가까운 본(히트박스 콜라이더가 붙은 본)을 찾아 데칼의 부모로 설정
-        Transform nearestBone = FindNearestBone(worldHitPoint);
-        if (nearestBone == null)
-        {
-            Debug.LogWarning($"[PaintReceiver] 가까운 본을 찾을 수 없음: {gameObject.name}");
-            return;
-        }
-
-        SpawnBodyDecal(worldHitPoint, hitNormal, teamColor, nearestBone);
-
-        // UV 스플랫도 유지 (paintMap에 누적 — SetReveal 시 사용)
+        // ── 1) UV 페인트맵 스탬프 (스텔스 해제용) ──
         if (paintCollider != null && stampMaterial != null)
         {
             UpdatePaintColliderMesh();
             Vector2 uv;
             if (TryGetUVAtPoint(worldHitPoint, hitNormal, out uv))
-                DrawSplat(uv, teamColor);
+            {
+                float radius = GetSplatRadius(hitTag);
+                DrawSplat(uv, teamColor, radius);
+            }
         }
+
+        // ── 2) DecalProjector 스폰 (비주얼용 — 벽 데칼과 동일한 모양) ──
+        Transform bone = FindNearestBone(worldHitPoint);
+        if (bone != null)
+            SpawnBodyDecal(worldHitPoint, hitNormal, teamColor, bone, hitTag);
     }
 
     /// <summary>
-    /// 히트 본의 자식으로 DecalProjector 데칼을 생성한다.
-    /// ObjectPoolManager에서 데칼을 가져오되, 부모를 본으로 설정.
+    /// 히트 태그에 따른 UV 스플랫 크기를 반환한다.
     /// </summary>
-    void SpawnBodyDecal(Vector3 worldPoint, Vector3 normal, Color color, Transform bone)
+    float GetSplatRadius(string hitTag)
+    {
+        switch (hitTag)
+        {
+            case "Head": return splatRadius * 0.6f;
+            case "Body": return splatRadius * 1.4f;
+            default:     return splatRadius;
+        }
+    }
+
+    // ── DecalProjector 바디 데칼 ─────────────────────────────────
+
+    /// <summary>
+    /// 히트 본의 자식으로 DecalProjector 데칼을 생성한다.
+    /// 벽/바닥 데칼과 동일한 머티리얼 → 동일한 자연스러운 비주얼.
+    /// </summary>
+    void SpawnBodyDecal(Vector3 worldPoint, Vector3 normal, Color color, Transform bone, string hitTag)
     {
         if (ObjectPoolManager.Instance == null) return;
 
         GameObject decal = ObjectPoolManager.Instance.GetDecal();
-
-        // 본의 자식으로 붙이기 (캐릭터와 함께 움직임)
         decal.transform.SetParent(bone, true);
-
-        // 위치: 충돌 지점, 표면에서 살짝 띄움
         decal.transform.position = worldPoint + normal * 0.005f;
-
-        // 회전: 법선 반대 방향으로 투영
         decal.transform.rotation = Quaternion.LookRotation(-normal, Vector3.up);
 
-        // 크기: 캐릭터 몸에 맞게 작게 (벽 데칼보다 작음)
+        // 부위별 데칼 크기 (자연스러운 페인트 크기)
+        float decalSize = hitTag == "Head" ? 0.15f : hitTag == "Body" ? 0.30f : 0.22f;
         var projector = decal.GetComponent<UnityEngine.Rendering.Universal.DecalProjector>();
         if (projector != null)
-        {
-            projector.size = new Vector3(0.15f, 0.15f, 0.1f);
-        }
+            projector.size = new Vector3(decalSize, decalSize, 0.1f);
 
-        // 팀 컬러 적용
+        decal.tag = "BodyDecal";
+
         var paintDecal = decal.GetComponent<PaintDecal>();
         if (paintDecal != null)
             paintDecal.SetColor(color);
-
-        Debug.Log($"[PaintReceiver] 바디 데칼 생성: {gameObject.name}, bone={bone.name}");
     }
 
     /// <summary>
@@ -202,30 +223,35 @@ public class PaintReceiver : MonoBehaviour
         {
             if (col.gameObject.layer != hitboxLayer) continue;
             float dist = Vector3.Distance(col.transform.position, worldPoint);
-            if (dist < minDist)
-            {
-                minDist = dist;
-                nearest = col.transform;
-            }
+            if (dist < minDist) { minDist = dist; nearest = col.transform; }
         }
 
-        // fallback: 히트박스 없으면 가장 가까운 본
         if (nearest == null && targetRenderer is SkinnedMeshRenderer smr)
         {
             foreach (var bone in smr.bones)
             {
                 if (bone == null) continue;
                 float dist = Vector3.Distance(bone.position, worldPoint);
-                if (dist < minDist)
-                {
-                    minDist = dist;
-                    nearest = bone;
-                }
+                if (dist < minDist) { minDist = dist; nearest = bone; }
             }
         }
-
         return nearest;
     }
+
+    /// <summary>
+    /// 본에 부착된 모든 바디 데칼을 풀로 반환한다.
+    /// 리스폰 시 MonkeyHealth에서 호출.
+    /// </summary>
+    public void ClearBodyDecals()
+    {
+        foreach (var decal in GetComponentsInChildren<PaintDecal>(true))
+        {
+            if (decal.transform.parent != null && decal.transform.parent != transform)
+                decal.ReturnToPoolPublic();
+        }
+    }
+
+
 
     /// <summary>
     /// SkinnedMeshRenderer면 BakeMesh, 일반 MeshRenderer면 sharedMesh를 사용한다.
@@ -270,17 +296,18 @@ public class PaintReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// PaintStamp 셰이더를 사용하여 페인트맵 RenderTexture 위에 원형 스플랫을 그린다.
+    /// PaintStamp 셰이더를 사용하여 페인트맵 위에 스플래터 텍스처를 그린다.
+    /// 매번 랜덤 회전각을 적용하여 반복감을 줄인다.
     /// [왜 temp RenderTexture를 쓰는가?]
     /// 같은 RenderTexture를 동시에 읽기+쓰기하면 정의되지 않은 동작이 발생한다.
-    /// 임시 RT에 먼저 그린 뒤, 다시 원본에 복사해야 안전하다.
     /// </summary>
-    void DrawSplat(Vector2 uv, Color color)
+    void DrawSplat(Vector2 uv, Color color, float radius)
     {
         stampMaterial.SetVector(PropSplatCenter, new Vector4(uv.x, uv.y, 0, 0));
-        stampMaterial.SetFloat(PropSplatRadius, splatRadius);
+        stampMaterial.SetFloat(PropSplatRadius, radius);
         stampMaterial.SetColor(PropSplatColor, color);
         stampMaterial.SetFloat(PropSplatHardness, splatHardness);
+        stampMaterial.SetFloat(PropSplatAngle, Random.Range(0f, Mathf.PI * 2f));
 
         RenderTexture temp = RenderTexture.GetTemporary(paintMap.descriptor);
         Graphics.Blit(paintMap, temp, stampMaterial);
@@ -301,7 +328,7 @@ public class PaintReceiver : MonoBehaviour
         if (stampMaterial == null || paintMap == null) return;
 
         Vector2 randomUV = new Vector2(Random.Range(0.05f, 0.95f), Random.Range(0.05f, 0.95f));
-        DrawSplat(randomUV, color);
+        DrawSplat(randomUV, color, splatRadius);
     }
 
     /// <summary>

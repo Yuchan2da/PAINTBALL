@@ -357,7 +357,10 @@ public class MonkeyHealth : MonoBehaviourPun
 
         // 4) 페인트 완전 초기화 (깨끗한 몸으로 부활)
         if (paintReceiver != null)
+        {
             paintReceiver.ClearPaintMap();
+            paintReceiver.ClearBodyDecals();
+        }
 
         // 5) 애니메이션 리셋 (Respawn 트리거로 Idle 복귀)
         if (animator != null)
@@ -393,7 +396,10 @@ public class MonkeyHealth : MonoBehaviourPun
 
         // 페인트 초기화 (깨끗한 몸 + 스텔스 복원)
         if (paintReceiver != null)
+        {
             paintReceiver.ClearPaintMap();
+            paintReceiver.ClearBodyDecals();
+        }
 
         // 애니메이션 리셋 — 직접 Blend Tree(Idle)로 전환
         if (animator != null)

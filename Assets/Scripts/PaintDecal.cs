@@ -55,6 +55,11 @@ public class PaintDecal : MonoBehaviour
 
     void Update()
     {
+        // 바디 데칼(BodyDecal 태그)은 수명 만료로 사라지지 않음
+        // 리스폰 시 ClearBodyDecals()로만 제거됨
+        if (gameObject.CompareTag("BodyDecal"))
+            return;
+
         timer -= Time.deltaTime;
         if (timer <= 0f)
             ReturnToPool();
@@ -78,9 +83,20 @@ public class PaintDecal : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 외부(ClearBodyDecals)에서 풀 반환을 요청할 때 사용.
+    /// </summary>
+    public void ReturnToPoolPublic()
+    {
+        ReturnToPool();
+    }
+
     void ReturnToPool()
     {
-        // 본에 붙어있었을 수 있으므로 부모 해제
+        // 태그 초기화 (풀 재사용 시 바디 데칼 모드 해제)
+        gameObject.tag = "Untagged";
+
+        // 안전: 부모가 설정되어 있을 경우 해제 (풀 재사용 시 충돌 방지)
         transform.SetParent(null, false);
 
         if (ObjectPoolManager.Instance != null)
