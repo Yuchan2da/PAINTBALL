@@ -116,8 +116,6 @@ public class MonkeyHealth : MonoBehaviourPun
             lastWasHeadshot = isHeadshot;
         }
 
-        Debug.Log($"[피격] {gameObject.name} | 데미지: {damage} | 남은 HP: {CurrentHp}/{maxHp}");
-
         if (IsDead)
         {
             HandleDeath();
@@ -153,8 +151,6 @@ public class MonkeyHealth : MonoBehaviourPun
     /// </summary>
     void HandleDeath()
     {
-        Debug.Log($"[처치] {gameObject.name} 사망! (by {lastAttackerName})");
-
         // ScoreManager에 킬/데스 기록
         // [네트워크] 연결 시 전 클라이언트에 RPC 브로드캐스트
         if (ScoreManager.Instance != null && !string.IsNullOrEmpty(lastAttackerName))
@@ -166,12 +162,8 @@ public class MonkeyHealth : MonoBehaviourPun
         }
 
         // 네트워크: 원격 클라이언트에도 사망 연출 전송
-        Debug.Log($"[HandleDeath] RPC조건: IsConnected={PhotonNetwork.IsConnected}, photonView={photonView != null}, IsMine={photonView?.IsMine}");
         if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
-        {
-            Debug.Log($"[HandleDeath] RPC_RemoteDie 전송! viewID={photonView.ViewID}");
             photonView.RPC(nameof(RPC_RemoteDie), RpcTarget.Others);
-        }
 
         StartCoroutine(DeathRoutine());
     }
@@ -183,8 +175,6 @@ public class MonkeyHealth : MonoBehaviourPun
     [PunRPC]
     void RPC_RemoteDie()
     {
-        Debug.Log($"[RPC_RemoteDie] {gameObject.name} 원격 사망 연출 수신! paintReceiver={paintReceiver != null}, animator={animator != null}");
-
         // animator가 아직 캐싱 안 되었을 수 있음 (Start() 순서 문제)
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -197,7 +187,6 @@ public class MonkeyHealth : MonoBehaviourPun
         if (paintReceiver != null)
         {
             paintReceiver.SetReveal(1f);
-            Debug.Log($"[RPC_RemoteDie] {gameObject.name}: SetReveal(1) 호출 완료");
         }
         else
         {
@@ -218,7 +207,6 @@ public class MonkeyHealth : MonoBehaviourPun
         {
             // CrossFade는 상태 이름 해시로 직접 전환 → Trigger 타이밍 문제 없음
             animator.Play("Die", 0, 0f);
-            Debug.Log($"[RPC_RemoteDie] {gameObject.name}: animator.Play('Die') 호출 완료");
         }
         else
             Debug.LogWarning($"[RPC_RemoteDie] {gameObject.name}: animator가 null!");
@@ -329,7 +317,7 @@ public class MonkeyHealth : MonoBehaviourPun
         if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
             return;
 
-        Debug.Log($"[리스폰] {gameObject.name} 부활!");
+
 
         // 1) 카메라 1인칭 복원
         RestoreFirstPersonCam();
@@ -383,7 +371,7 @@ public class MonkeyHealth : MonoBehaviourPun
     [PunRPC]
     void RPC_RemoteRespawn()
     {
-        Debug.Log($"[RPC_RemoteRespawn] {gameObject.name} 원격 리스폰 연출 수신!");
+
 
         // fallback
         if (animator == null)

@@ -334,6 +334,10 @@ public class GameHUD : MonoBehaviour
                 // 이전 라운드 UI 정리
                 if (scoreboardPanel != null) scoreboardPanel.SetActive(false);
                 ClearKillFeed();
+
+                // GameOver에서 옮긴 RectTransform 위치 원복
+                ResetUiPositions();
+
                 ForceRefresh();
                 break;
 
@@ -356,11 +360,32 @@ public class GameHUD : MonoBehaviour
     {
         ShowStateText("GAME OVER!\n#1: " + winnerName);
 
+        // 승리 텍스트를 화면 상단으로 이동 (스코어보드와 겹침 방지)
+        if (stateText != null)
+        {
+            var rt = stateText.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.5f, 0.85f);
+                rt.anchorMax = new Vector2(0.5f, 0.85f);
+                rt.anchoredPosition = Vector2.zero;
+            }
+        }
+
         // 점수판 자동 표시
         if (scoreboardPanel != null)
         {
             scoreboardPanel.SetActive(true);
             RefreshScoreboard();
+
+            // 스코어보드를 화면 중앙~하단으로 이동
+            var sbRt = scoreboardPanel.GetComponent<RectTransform>();
+            if (sbRt != null)
+            {
+                sbRt.anchorMin = new Vector2(0.5f, 0.35f);
+                sbRt.anchorMax = new Vector2(0.5f, 0.35f);
+                sbRt.anchoredPosition = Vector2.zero;
+            }
         }
     }
 
@@ -377,6 +402,34 @@ public class GameHUD : MonoBehaviour
     {
         if (stateText == null) return;
         stateText.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// GameOver에서 옮긴 UI 위치를 화면 중앙으로 원복.
+    /// </summary>
+    void ResetUiPositions()
+    {
+        if (stateText != null)
+        {
+            var rt = stateText.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+            }
+        }
+
+        if (scoreboardPanel != null)
+        {
+            var sbRt = scoreboardPanel.GetComponent<RectTransform>();
+            if (sbRt != null)
+            {
+                sbRt.anchorMin = new Vector2(0.5f, 0.5f);
+                sbRt.anchorMax = new Vector2(0.5f, 0.5f);
+                sbRt.anchoredPosition = Vector2.zero;
+            }
+        }
     }
 
     // ── 강제 갱신 (Start, 리스폰 등에서 호출용) ──────────────────

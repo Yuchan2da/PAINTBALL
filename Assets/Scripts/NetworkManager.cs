@@ -60,8 +60,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // ── ScoreManager에 등록 (킬/데스 추적 시작) ──
         if (ScoreManager.Instance != null)
             ScoreManager.Instance.RegisterPlayer(PhotonNetwork.NickName);
-
-        Debug.Log($"[NetworkManager] 플레이어 스폰 완료: {PhotonNetwork.NickName} at {spawnPos}");
     }
 
     /// <summary>

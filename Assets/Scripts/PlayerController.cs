@@ -139,6 +139,10 @@ public class PlayerController : MonoBehaviourPun
         // 원격 플레이어는 입력 처리하지 않음
         if (!isLocalPlayer) return;
 
+        // GameManager가 Playing 상태가 아니면 입력 차단 (카운트다운/게임오버 등)
+        if (GameManager.Instance != null && !GameManager.Instance.IsPlaying)
+            inputEnabled = false;
+
         if (!inputEnabled)
         {
             // 사망 상태에서도 중력만 적용 (공중에서 죽으면 바닥으로 내려와야 함)
@@ -229,7 +233,6 @@ public class PlayerController : MonoBehaviourPun
 
         if (distanceMoved <= minMoveDistance)
         {
-            Debug.Log($"[패널티] 5초간 이동 거리 {distanceMoved:F2}m — 정지 패널티 발동!");
             SpawnPenaltyDecal();
         }
 

@@ -65,6 +65,15 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
     // Photon Custom Properties 키
     private const string PROP_TEAM_COLOR = "tc";
 
+    // 플레이어별 고유 색상 팔레트 (ActorNumber % 개수로 선택)
+    private static readonly Color[] PlayerColors = new Color[]
+    {
+        new Color(0.90f, 0.15f, 0.15f, 1f), // 빨강
+        new Color(0.15f, 0.40f, 0.90f, 1f), // 파랑
+        new Color(0.10f, 0.80f, 0.30f, 1f), // 초록
+        new Color(0.95f, 0.75f, 0.05f, 1f), // 노랑
+    };
+
     void Start()
     {
         // Photon IsMine으로 로컬/원격 분리 (OfflineMode에서도 정상 동작)
@@ -78,12 +87,14 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         if (playerCamera == null)
             playerCamera = GetComponentInChildren<Camera>();
 
-        // ── teamColor 네트워크 동기화 ──
+        // ── teamColor: ActorNumber 기반 고유 색상 배정 ──
         if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode && photonView != null)
         {
             if (photonView.IsMine)
             {
-                // 로컬: 내 teamColor를 Custom Properties로 전송
+                // 로컬: ActorNumber로 색상 결정 → Custom Properties로 전송
+                int actorNum = PhotonNetwork.LocalPlayer.ActorNumber;
+                teamColor = PlayerColors[(actorNum - 1) % PlayerColors.Length];
                 SyncTeamColorToNetwork();
             }
             else
@@ -216,8 +227,6 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         var pc = GetComponent<PlayerController>();
         if (pc != null)
             pc.ApplyRecoil(recoilAngle);
-
-        Debug.Log($"발사! 잔탄: {CurrentAmmo}/{maxAmmo}");
     }
 
     IEnumerator ReloadRoutine()
@@ -228,14 +237,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         if (SFXManager.Instance != null)
             SFXManager.Instance.PlayReload(transform.position);
 
-        Debug.Log($"재장전 중... ({reloadTime}초)");
-
         yield return new WaitForSeconds(reloadTime);
 
         CurrentAmmo = maxAmmo;
         isReloading = false;
-
-        Debug.Log($"재장전 완료! {CurrentAmmo}/{maxAmmo}");
     }
 
     // ── 네트워크 페인트 동기화 RPC ────────────────────────────────────

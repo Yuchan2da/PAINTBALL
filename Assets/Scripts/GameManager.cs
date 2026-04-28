@@ -120,7 +120,7 @@ public class GameManager : MonoBehaviourPunCallbacks
             if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(PROP_START_TIME, out startTimeObj))
             {
                 networkStartTime = (double)startTimeObj;
-                Debug.Log($"[GameManager] startTime 동기화 완료: {networkStartTime}");
+
             }
         }
     }
@@ -153,7 +153,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         if (propertiesThatChanged.ContainsKey(PROP_START_TIME))
         {
             networkStartTime = (double)propertiesThatChanged[PROP_START_TIME];
-            Debug.Log($"[GameManager] startTime 프로퍼티 수신: {networkStartTime}");
+
         }
     }
 
@@ -205,6 +205,10 @@ public class GameManager : MonoBehaviourPunCallbacks
         {
             CountdownTime = 0f;
             RemainingTime = roundDuration;
+
+            // 카운트다운 중 늦게 스폰된 플레이어도 스코어보드에 등록
+            RegisterAllPlayers();
+
             SetState(GameState.Playing);
 
             // 플레이 시작 → 조작 활성화
@@ -295,6 +299,7 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     /// <summary>
     /// 씬의 모든 MonkeyHealth를 찾아 ScoreManager에 등록한다.
+    /// PhotonView의 Owner 닉네임을 사용하여 정확한 이름을 보장.
     /// </summary>
     void RegisterAllPlayers()
     {
@@ -303,7 +308,17 @@ public class GameManager : MonoBehaviourPunCallbacks
         var allHealth = FindObjectsByType<MonkeyHealth>(FindObjectsSortMode.None);
         foreach (var health in allHealth)
         {
-            ScoreManager.Instance.RegisterPlayer(health.gameObject.name);
+            // PhotonView Owner 닉네임 우선, 없으면 gameObject.name 폴백
+            string playerName = health.gameObject.name;
+            var pv = health.GetComponent<Photon.Pun.PhotonView>();
+            if (pv != null && pv.Owner != null && !string.IsNullOrEmpty(pv.Owner.NickName))
+            {
+                playerName = pv.Owner.NickName;
+                // 원격 플레이어의 gameObject.name도 닉네임으로 통일
+                // (킬피드/데미지 추적에서 gameObject.name을 사용하므로)
+                health.gameObject.name = playerName;
+            }
+            ScoreManager.Instance.RegisterPlayer(playerName);
         }
     }
 

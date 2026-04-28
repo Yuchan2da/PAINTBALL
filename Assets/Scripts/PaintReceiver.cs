@@ -198,7 +198,7 @@ public class PaintReceiver : MonoBehaviour
         decal.transform.rotation = Quaternion.LookRotation(-normal, Vector3.up);
 
         // 부위별 데칼 크기 (자연스러운 페인트 크기)
-        float decalSize = hitTag == "Head" ? 0.15f : hitTag == "Body" ? 0.30f : 0.22f;
+        float decalSize = hitTag == "Head" ? 0.30f : hitTag == "Body" ? 0.45f : 0.40f;
         var projector = decal.GetComponent<UnityEngine.Rendering.Universal.DecalProjector>();
         if (projector != null)
             projector.size = new Vector3(decalSize, decalSize, 0.1f);

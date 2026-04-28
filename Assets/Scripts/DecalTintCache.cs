@@ -73,7 +73,7 @@ public static class DecalTintCache
         if (mat != null)
         {
             cache[color] = mat;
-            Debug.Log($"[DecalTintCache] Registered: {color} → {mat.name}");
+
         }
         else
         {

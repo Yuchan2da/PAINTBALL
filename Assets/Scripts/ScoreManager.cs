@@ -67,7 +67,7 @@ public class ScoreManager : MonoBehaviourPun
         scoreMap[playerName] = new PlayerScore(playerName);
         rankingDirty = true;
 
-        Debug.Log($"[ScoreManager] 플레이어 등록: {playerName}");
+
     }
 
     // ── 킬/데스 기록 ─────────────────────────────────────────────────
@@ -87,7 +87,7 @@ public class ScoreManager : MonoBehaviourPun
 
         rankingDirty = true;
 
-        Debug.Log($"[ScoreManager] 킬! {killerName} → {victimName} (헤드샷: {isHeadshot})");
+
 
         // 킬 이벤트 발행 → GameHUD 킬 피드가 구독
         OnKillEvent?.Invoke(killerName, victimName, isHeadshot);
@@ -160,6 +160,6 @@ public class ScoreManager : MonoBehaviourPun
             score.deaths = 0;
         }
         rankingDirty = true;
-        Debug.Log("[ScoreManager] 전체 점수 리셋");
+
     }
 }

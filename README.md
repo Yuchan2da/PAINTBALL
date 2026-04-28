@@ -120,6 +120,9 @@
 - PaintProjectile: 로컬 생성/파괴, 충돌 시 데미지만 RPC 전달 (FPS 표준 아키텍처)
 - NetworkManager: 스폰 후 닉네임/HUD/ScoreManager 자동 등록 + OfflineMode 호환
 - `AutomaticallySyncScene` + `PhotonNetwork.LoadLevel`로 전원 동시 씬 전환
+- **ActorNumber 기반 팀 색상 자동 배정**: 빨강/파랑/초록/노랑 4색 팔레트
+- **원격 플레이어 이름 동기화**: PhotonView.Owner.NickName으로 스코어보드/킬피드 이름 보장
+- **카운트다운 입력 차단 강화**: GameManager 상태를 PlayerController에서 매 프레임 직접 체크
 
 ---
 
@@ -138,9 +141,6 @@
 
 ## 📌 앞으로 할 것
 
-- 바디 페인트 데칼 크기/비주얼 세부 튜닝
-- 사망 시 바디 데칼 제거 + 리스폰 클린업
-- 사망/리스폰 연출 네트워크 안정성 추가 검증
 - 캐릭터 스킨/컬러 선택 시스템
 - BGM 및 킬 달성 특수 사운드 연출
 - 1인칭 페인트볼 건 비주얼 모델 추가

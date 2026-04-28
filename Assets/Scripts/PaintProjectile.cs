@@ -61,9 +61,6 @@ public class PaintProjectile : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        // ── 디버그: 총알이 뭐에 맞았는지 기록 ──
-        Debug.Log($"[PaintProjectile] 충돌! 대상={collision.gameObject.name}, tag={collision.gameObject.tag}, layer={LayerMask.LayerToName(collision.gameObject.layer)}, root={collision.transform.root.name}");
-
         // ── 자해 방지 ──────────────────────────────────────────
         if (ownerRoot != null && collision.transform.root == ownerRoot)
             return;
@@ -82,7 +79,6 @@ public class PaintProjectile : MonoBehaviour
             var paintReceiver = collision.gameObject.GetComponentInParent<PaintReceiver>();
             if (paintReceiver != null)
             {
-                Debug.Log($"[PaintProjectile] UV페인트 시도: target={collision.gameObject.name}, point={contact.point}, normal={contact.normal}");
                 paintReceiver.PaintAt(contact.point, contact.normal, teamColor, collision.gameObject.tag);
 
                 // 네트워크: 다른 클라이언트에도 UV 페인트 동기화
