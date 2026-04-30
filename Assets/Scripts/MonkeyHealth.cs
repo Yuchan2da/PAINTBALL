@@ -220,6 +220,10 @@ public class MonkeyHealth : MonoBehaviourPun
         // === 1단계: 조작 잠금 ===
         SetInputEnabled(false);
 
+        // === 1.5단계: 건 모델 숨기기 (데스캠에서 총이 보이면 부자연스러움) ===
+        if (playerShooter != null && playerShooter.fpsGunModel != null)
+            playerShooter.fpsGunModel.SetVisible(false);
+
         // === 2단계: 정체 노출! 투명화 완전 해제 ===
         // 죽는 순간 스텔스가 풀리면서 원래 캐릭터 스킨이 100% 보인다
         if (paintReceiver != null)
@@ -360,7 +364,11 @@ public class MonkeyHealth : MonoBehaviourPun
         // 6) 조작 활성화 (마지막에 풀어야 안전)
         SetInputEnabled(true);
 
-        // 7) 네트워크: 원격 클라이언트에도 리스폰 연출 전송
+        // 7) 건 모델 복원 (1인칭 건이 다시 보임)
+        if (playerShooter != null && playerShooter.fpsGunModel != null)
+            playerShooter.fpsGunModel.SetVisible(true);
+
+        // 8) 네트워크: 원격 클라이언트에도 리스폰 연출 전송
         if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
             photonView.RPC(nameof(RPC_RemoteRespawn), RpcTarget.Others);
     }

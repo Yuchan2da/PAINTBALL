@@ -28,6 +28,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
     [Tooltip("발사 시 카메라 반동 각도 (X축 위로)")]
     public float recoilAngle = 2f;
 
+    [Header("1인칭 건 모델")]
+    [Tooltip("FPSGunModel 컴포넌트 (Main Camera 자식에 배치)")]
+    public FPSGunModel fpsGunModel;
+
     [Header("팀 색상")]
     [Tooltip("이 플레이어가 발사하는 총알 색상. 멀티플레이에서 Photon으로 동기화 예정")]
     public Color teamColor = Color.red;
@@ -94,13 +98,22 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
             {
                 // 로컬: ActorNumber로 색상 결정 → Custom Properties로 전송
                 int actorNum = PhotonNetwork.LocalPlayer.ActorNumber;
-                teamColor = PlayerColors[(actorNum - 1) % PlayerColors.Length];
+                int teamIndex = (actorNum - 1) % PlayerColors.Length;
+                teamColor = PlayerColors[teamIndex];
                 SyncTeamColorToNetwork();
+
+                // 1인칭 건 모델 팀색 적용
+                if (fpsGunModel != null)
+                    fpsGunModel.SetTeamSkin(teamIndex);
             }
             else
             {
                 // 원격: 상대방의 Custom Properties에서 teamColor 읽기
                 ReadTeamColorFromNetwork();
+
+                // 원격 플레이어의 건 모델은 표시하지 않음 (투명 캐릭터 게임 특성)
+                if (fpsGunModel != null)
+                    fpsGunModel.SetVisible(false);
             }
         }
     }
@@ -227,11 +240,19 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         var pc = GetComponent<PlayerController>();
         if (pc != null)
             pc.ApplyRecoil(recoilAngle);
+
+        // ── 건 모델 반동 ──
+        if (fpsGunModel != null)
+            fpsGunModel.PlayRecoil();
     }
 
     IEnumerator ReloadRoutine()
     {
         isReloading = true;
+
+        // 건 모델 재장전 연출 시작
+        if (fpsGunModel != null)
+            fpsGunModel.SetReloading(true);
 
         // 재장전 사운드 (시작 시 재생)
         if (SFXManager.Instance != null)
@@ -241,6 +262,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
 
         CurrentAmmo = maxAmmo;
         isReloading = false;
+
+        // 건 모델 재장전 연출 종료
+        if (fpsGunModel != null)
+            fpsGunModel.SetReloading(false);
     }
 
     // ── 네트워크 페인트 동기화 RPC ────────────────────────────────────

@@ -33,6 +33,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 291026248487842458}
+  - {fileID: 7549873528991664171}
   m_Father: {fileID: 6116331878250722748}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &2908234731975847862
@@ -247,6 +248,7 @@ MonoBehaviour:
   fireForce: 35
   muzzleFlash: {fileID: 1484764872790053669}
   recoilAngle: 2
+  fpsGunModel: {fileID: 1834041158928250599}
   teamColor: {r: 1, g: 0, b: 0, a: 1}
   fireCooldown: 0.11
   maxAmmo: 15
@@ -353,6 +355,56 @@ MonoBehaviour:
   m_SynchronizeRotation: 1
   m_SynchronizeScale: 0
   m_UseLocal: 1
+--- !u!1 &5723279004241227006
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7549873528991664171}
+  - component: {fileID: 1834041158928250599}
+  m_Layer: 0
+  m_Name: GunModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7549873528991664171
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5723279004241227006}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.415, y: 0, z: 0.365}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 4211727448194383986}
+  m_Father: {fileID: 5723393910115821529}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1834041158928250599
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5723279004241227006}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1f1495925bd333408eb56ece8c49ac6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FPSGunModel
+  recoilKickback: 0.03
+  recoilRecovery: 10
+  reloadTiltAngle: -30
+  reloadTiltSpeed: 5
+  markerBodyGroup: {fileID: 3357159613285824219}
 --- !u!1 &6344338284912530977
 GameObject:
   m_ObjectHideFlags: 0
@@ -6154,3 +6206,76 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.39948988
   m_Center: {x: -0.40710545, y: -0.00000017101688, z: 0.00000013726559}
+--- !u!1001 &6159020815445521546
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7549873528991664171}
+    m_Modifications:
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.236
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.15730004
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.096
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8821762834127311646, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+      propertyPath: m_Name
+      value: Paintball_Maker
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+--- !u!114 &3357159613285824219 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8930139076622647889, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+  m_PrefabInstance: {fileID: 6159020815445521546}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5375c189d275328488b7333680f3bfd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &4211727448194383986 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8001263763418150136, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+  m_PrefabInstance: {fileID: 6159020815445521546}
+  m_PrefabAsset: {fileID: 0}
