@@ -14888,6 +14888,10 @@ MonoBehaviour:
   hitClip: {fileID: 8300000, guid: 0c6b7f94aa31c5d40b1de32289eee28d, type: 3}
   headshotClip: {fileID: 8300000, guid: 60713cba5947f5042a948463f083f677, type: 3}
   reloadClip: {fileID: 8300000, guid: ee185938b48fb594bb418deab94ee47d, type: 3}
+  killClip: {fileID: 8300000, guid: 65c92ce9f4491aa41be11ba58e7a36d4, type: 3}
+  headshotKillClip: {fileID: 8300000, guid: 465a4650625914544b28665e8b551fd7, type: 3}
+  bgmClip: {fileID: 8300000, guid: 17ed710794bce1046a1e98512c74286a, type: 3}
+  bgmVolume: 0.3
   poolSize: 10
   maxDistance: 30
 --- !u!4 &2073288134

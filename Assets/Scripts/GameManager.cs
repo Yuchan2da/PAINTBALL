@@ -193,6 +193,10 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         // 카운트다운 중에는 조작 잠금
         SetAllPlayersInput(false);
+
+        // BGM 시작
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.PlayBGM();
     }
 
     // ── 상태별 핸들러 ────────────────────────────────────────────────
@@ -247,6 +251,7 @@ public class GameManager : MonoBehaviourPunCallbacks
             // 멀티플레이: 로비로 복귀
             if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
             {
+                if (SFXManager.Instance != null) SFXManager.Instance.StopBGM();
                 PhotonNetwork.LeaveRoom();
                 UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
             }
@@ -266,6 +271,10 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         // 조작 잠금
         SetAllPlayersInput(false);
+
+        // BGM 페이드아웃
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.FadeOutBGM(2f);
 
         // 1등 판정
         string winnerName = "None";
