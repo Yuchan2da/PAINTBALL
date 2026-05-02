@@ -405,6 +405,9 @@ MonoBehaviour:
   reloadTiltAngle: -30
   reloadTiltSpeed: 5
   markerBodyGroup: {fileID: 3357159613285824219}
+  muzzleGroup: {fileID: 3357159614723628963}
+  gripGroup: {fileID: 3357159614280211958}
+  flashGroup: {fileID: 3357159614676386556}
 --- !u!1 &6344338284912530977
 GameObject:
   m_ObjectHideFlags: 0
@@ -6266,6 +6269,39 @@ PrefabInstance:
 --- !u!114 &3357159613285824219 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8930139076622647889, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+  m_PrefabInstance: {fileID: 6159020815445521546}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5375c189d275328488b7333680f3bfd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &3357159614280211958 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8930139077876410748, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+  m_PrefabInstance: {fileID: 6159020815445521546}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5375c189d275328488b7333680f3bfd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &3357159614676386556 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8930139077476300406, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
+  m_PrefabInstance: {fileID: 6159020815445521546}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5375c189d275328488b7333680f3bfd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &3357159614723628963 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8930139077366147881, guid: 945b62c9bdfdbd7459e6bc27f2f23094, type: 3}
   m_PrefabInstance: {fileID: 6159020815445521546}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}

@@ -40,9 +40,18 @@ public class FPSGunModel : MonoBehaviour
     [Tooltip("기울기 전환 속도")]
     public float reloadTiltSpeed = 5f;
 
-    [Header("MarkerBody 팀색 매핑")]
-    [Tooltip("MarkerBody의 CustomizableGroup (Inspector에서 연결)")]
+    [Header("파츠 CustomizableGroup (Inspector에서 연결)")]
+    [Tooltip("MarkerBody — 팀색 자동 매칭")]
     public CustomizableGroup markerBodyGroup;
+
+    [Tooltip("Fire_Mouths — 총구")]
+    public CustomizableGroup muzzleGroup;
+
+    [Tooltip("Grips — 그립")]
+    public CustomizableGroup gripGroup;
+
+    [Tooltip("Flahs_Lights — 플래시라이트")]
+    public CustomizableGroup flashGroup;
 
     // ── 내부 상태 ─────────────────────────────────────────────────
     private Vector3 originLocalPos;
@@ -60,6 +69,14 @@ public class FPSGunModel : MonoBehaviour
 
     void Start()
     {
+        // 원격 플레이어에게는 1인칭 건 모델이 불필요 → 즉시 비활성화
+        var pv = GetComponentInParent<Photon.Pun.PhotonView>();
+        if (pv != null && !pv.IsMine)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
+
         // 원래 위치/회전 저장 (반동/재장전 복귀 기준점)
         originLocalPos = transform.localPosition;
         originLocalRot = transform.localRotation;
@@ -69,6 +86,9 @@ public class FPSGunModel : MonoBehaviour
 
         // CustomizableGroup의 Update() 비활성화 (E/Q 키 입력 차단)
         DisableGroupUpdates();
+
+        // PlayerPrefs에서 저장된 커스터마이징 적용 (로컬 전용)
+        ApplyCustomization();
     }
 
     // ── 공개 메서드 (PlayerShooter에서 호출) ──────────────────────
@@ -105,6 +125,51 @@ public class FPSGunModel : MonoBehaviour
     public void SetVisible(bool visible)
     {
         gameObject.SetActive(visible);
+    }
+
+    /// <summary>
+    /// PlayerPrefs / Photon Custom Properties에 저장된 커스터마이징을 적용한다.
+    /// Photon CP를 우선으로 읽어 같은 PC 멀티 인스턴스에서도 독립 적용.
+    /// </summary>
+    public void ApplyCustomization()
+    {
+        // 로컬 플레이어의 Photon Player 참조 확보
+        Photon.Realtime.Player owner = null;
+        var pv = GetComponentInParent<PhotonView>();
+        if (pv != null && pv.Owner != null)
+            owner = pv.Owner;
+
+        ApplyGroupFromPlayer(muzzleGroup, GunCustomizeUI.KEY_MUZZLE, 0, owner);
+        ApplyGroupFromPlayer(gripGroup,   GunCustomizeUI.KEY_GRIP,   0, owner);
+
+        // 플래시라이트: 기본값 -1 → "없음" (= Childs.Count)
+        int flashDefault = (flashGroup != null) ? flashGroup.Childs.Count : 0;
+        ApplyGroupFromPlayer(flashGroup, GunCustomizeUI.KEY_FLASH, flashDefault, owner);
+    }
+
+    /// <summary>Photon CP 우선, PlayerPrefs 폴백으로 ID를 읽어 CustomizableGroup에 적용.</summary>
+    private void ApplyGroupFromPlayer(CustomizableGroup group, string key, int defaultID,
+                                       Photon.Realtime.Player owner)
+    {
+        if (group == null) return;
+
+        // Childs 미초기화 방어
+        if (group.Childs.Count == 0)
+        {
+            for (int i = 0; i < group.transform.childCount; i++)
+                group.Childs.Add(group.transform.GetChild(i).gameObject);
+        }
+
+        // Photon CP 우선 → PlayerPrefs 폴백
+        int savedID = GunCustomizeUI.GetSavedIDForPlayer(owner, key, defaultID);
+
+        // -1 (미저장 플래시) → "없음" 상태
+        if (savedID < 0 && group.OppitionalItem)
+            savedID = group.Childs.Count;
+
+        int maxID = group.OppitionalItem ? group.Childs.Count : group.Childs.Count - 1;
+        group.ItemID = Mathf.Clamp(savedID, 0, maxID);
+        group.UpdateVisibility();
     }
 
     // ── 애니메이션 업데이트 ───────────────────────────────────────
