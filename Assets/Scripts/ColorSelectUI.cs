@@ -67,8 +67,7 @@ public class ColorSelectUI : MonoBehaviourPunCallbacks
     [Tooltip("현재 선택된 색상 이름 표시")]
     [SerializeField] private TMP_Text selectedColorLabel;
 
-    [Tooltip("패널 열기/닫기 토글 버튼 (RoomPanel에 배치)")]
-    [SerializeField] private Button toggleButton;
+
 
     // ====================================================================
     //  내부 상태
