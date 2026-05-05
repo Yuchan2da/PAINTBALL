@@ -60,12 +60,8 @@ public class FPSGunModel : MonoBehaviour
     private bool isReloading;
     private float currentTiltAngle;
 
-    // PlayerShooter의 PlayerColors 인덱스 → MarkerBody 스킨 인덱스 매핑
-    // PlayerColors: [0]=빨강, [1]=파랑, [2]=초록, [3]=노랑
-    // MarkerBody:   [0]=Skin_1, [1]=Blue, [2]=Green, [3]=Green2, [4]=Navy,
-    //               [5]=Orange, [6]=Pink, [7]=Purple, [8]=Red, [9]=White, [10]=Gold
-    private static readonly int[] TeamToSkinIndex = { 8, 1, 2, 5 };
-    // 빨강→Red(8), 파랑→Blue(1), 초록→Green(2), 노랑→Orange(5)
+    // ColorSelectUI.Palette 인덱스와 MarkerBody 스킨 인덱스가 1:1 대응.
+    // 매핑 배열 불필요 — paletteIndex를 그대로 사용.
 
     void Start()
     {
@@ -107,15 +103,14 @@ public class FPSGunModel : MonoBehaviour
 
     /// <summary>
     /// 팀 색상에 맞춰 MarkerBody 스킨을 전환한다.
-    /// teamIndex: PlayerShooter.PlayerColors 배열 인덱스 (0~3)
+    /// paletteIndex: ColorSelectUI.Palette 인덱스 (0~10, MarkerBody와 1:1 대응)
     /// </summary>
-    public void SetTeamSkin(int teamIndex)
+    public void SetTeamSkin(int paletteIndex)
     {
         if (markerBodyGroup == null) return;
 
-        int skinIndex = 0;
-        if (teamIndex >= 0 && teamIndex < TeamToSkinIndex.Length)
-            skinIndex = TeamToSkinIndex[teamIndex];
+        int maxSkin = markerBodyGroup.Childs.Count;
+        int skinIndex = Mathf.Clamp(paletteIndex, 0, maxSkin > 0 ? maxSkin - 1 : 0);
 
         markerBodyGroup.ItemID = skinIndex;
         markerBodyGroup.UpdateVisibility();

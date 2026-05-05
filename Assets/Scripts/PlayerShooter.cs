@@ -69,14 +69,18 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
     // Photon Custom Properties 키
     private const string PROP_TEAM_COLOR = "tc";
 
-    // 플레이어별 고유 색상 팔레트 (ActorNumber % 개수로 선택)
-    private static readonly Color[] PlayerColors = new Color[]
+    // 플레이어별 고유 색상: ColorSelectUI.Palette에서 통합 관리.
+    // 여기서는 팔레트 색상만 캐싱하여 사용한다.
+    private static Color[] PlayerColors;
+
+    /// <summary>팔레트 색상 배열 초기화 (최초 1회).</summary>
+    private static void EnsurePlayerColors()
     {
-        new Color(0.90f, 0.15f, 0.15f, 1f), // 빨강
-        new Color(0.15f, 0.40f, 0.90f, 1f), // 파랑
-        new Color(0.10f, 0.80f, 0.30f, 1f), // 초록
-        new Color(0.95f, 0.75f, 0.05f, 1f), // 노랑
-    };
+        if (PlayerColors != null && PlayerColors.Length == ColorSelectUI.Palette.Length) return;
+        PlayerColors = new Color[ColorSelectUI.Palette.Length];
+        for (int i = 0; i < ColorSelectUI.Palette.Length; i++)
+            PlayerColors[i] = ColorSelectUI.Palette[i].color;
+    }
 
     void Start()
     {
@@ -86,25 +90,30 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
 
         CurrentAmmo = maxAmmo;
         CacheHitboxColliders();
+        EnsurePlayerColors();
 
         // Inspector 미연결 시 자동 탐색
         if (playerCamera == null)
             playerCamera = GetComponentInChildren<Camera>();
 
-        // ── teamColor: ActorNumber 기반 고유 색상 배정 ──
+        // ── teamColor: 로비에서 선택한 색상 적용 ──
         if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode && photonView != null)
         {
             if (photonView.IsMine)
             {
-                // 로컬: ActorNumber로 색상 결정 → Custom Properties로 전송
-                int actorNum = PhotonNetwork.LocalPlayer.ActorNumber;
-                int teamIndex = (actorNum - 1) % PlayerColors.Length;
-                teamColor = PlayerColors[teamIndex];
+                // 로컬: 로비에서 선택한 팔레트 인덱스 읽기
+                int paletteIndex = ColorSelectUI.GetPlayerColorIndex(PhotonNetwork.LocalPlayer);
+
+                // 미선택 시 ActorNumber로 폴백
+                if (paletteIndex < 0 || paletteIndex >= PlayerColors.Length)
+                    paletteIndex = (PhotonNetwork.LocalPlayer.ActorNumber - 1) % PlayerColors.Length;
+
+                teamColor = PlayerColors[paletteIndex];
                 SyncTeamColorToNetwork();
 
-                // 1인칭 건 모델 팀색 적용
+                // 1인칭 건 모델 팀색 적용 (skinIndex = paletteIndex, 1:1 매핑)
                 if (fpsGunModel != null)
-                    fpsGunModel.SetTeamSkin(teamIndex);
+                    fpsGunModel.SetTeamSkin(paletteIndex);
             }
             else
             {
