@@ -97,12 +97,21 @@ public class MonkeyHealth : MonoBehaviourPun
 
     // [테스트 코드 제거됨] T/Y키 데미지 시뮬레이션 — 멀티플레이 전환으로 삭제.
 
+    /// <summary>로컬 플레이어 여부 판별. Photon 미연결 시 항상 true.</summary>
+    private bool IsLocalPlayer()
+    {
+        if (photonView == null || !PhotonNetwork.IsConnected) return true;
+        return photonView.IsMine;
+    }
+
     /// <summary>
     /// 외부에서 호출하는 유일한 데미지 진입점.
     /// killerName: 데미지를 준 플레이어 이름 (킬 판정용)
     /// isHeadshot: 헤드샷 여부 (킬 피드 표시용)
+    /// attackerColor: 공격자의 팀 컬러 (피격 이펙트용, null 시 기본 빨강)
     /// </summary>
-    public void TakeDamage(int damage, string killerName = "", bool isHeadshot = false)
+    public void TakeDamage(int damage, string killerName = "", bool isHeadshot = false,
+                           Color? attackerColor = null)
     {
         if (IsDead) return; // 이미 죽은 대상 중복 처리 방지
 
@@ -114,6 +123,16 @@ public class MonkeyHealth : MonoBehaviourPun
         {
             lastAttackerName = killerName;
             lastWasHeadshot = isHeadshot;
+        }
+
+        // ── 피격 화면 이펙트 (로컬 플레이어만) ──
+        if (IsLocalPlayer() && HitScreenEffect.Instance != null)
+        {
+            Color hitColor = attackerColor ?? Color.red;
+            HitScreenEffect.Instance.Play(hitColor);
+
+            float hpRatio = (float)CurrentHp / maxHp;
+            HitScreenEffect.Instance.SetLowHpWarning(hpRatio <= 0.2f);
         }
 
         if (IsDead)
@@ -129,19 +148,34 @@ public class MonkeyHealth : MonoBehaviourPun
     /// 사격자(A)가 호출 → RPC로 피격자(B)의 Owner에게 전달.
     /// [왜 Owner에게만?] HP는 Owner가 관리해야 일관성 보장.
     /// 여러 클라이언트가 동시에 HP를 깎으면 값이 꼬인다.
+    /// attackerColorArray: 공격자의 팀 컬러 (float[4] RGBA)
     /// </summary>
-    public void TakeDamageNetwork(int damage, string killerName, bool isHeadshot)
+    public void TakeDamageNetwork(int damage, string killerName, bool isHeadshot,
+                                   float[] attackerColorArray = null)
     {
         if (photonView != null && PhotonNetwork.IsConnected)
-            photonView.RPC(nameof(RPC_TakeDamage), photonView.Owner, damage, killerName, isHeadshot);
+        {
+            float[] colorData = attackerColorArray ?? new float[] { 1f, 0f, 0f, 1f };
+            photonView.RPC(nameof(RPC_TakeDamage), photonView.Owner,
+                           damage, killerName, isHeadshot, colorData);
+        }
         else
-            TakeDamage(damage, killerName, isHeadshot);
+        {
+            Color c = (attackerColorArray != null && attackerColorArray.Length >= 4)
+                ? new Color(attackerColorArray[0], attackerColorArray[1],
+                            attackerColorArray[2], attackerColorArray[3])
+                : Color.red;
+            TakeDamage(damage, killerName, isHeadshot, c);
+        }
     }
 
     [PunRPC]
-    void RPC_TakeDamage(int damage, string killerName, bool isHeadshot)
+    void RPC_TakeDamage(int damage, string killerName, bool isHeadshot, float[] attackerColor)
     {
-        TakeDamage(damage, killerName, isHeadshot);
+        Color c = (attackerColor != null && attackerColor.Length >= 4)
+            ? new Color(attackerColor[0], attackerColor[1], attackerColor[2], attackerColor[3])
+            : Color.red;
+        TakeDamage(damage, killerName, isHeadshot, c);
     }
 
     // ── 사망 처리 ─────────────────────────────────────────────────
@@ -346,6 +380,13 @@ public class MonkeyHealth : MonoBehaviourPun
 
         // 3) HP 복구
         CurrentHp = maxHp;
+
+        // 3.5) 피격 화면 이펙트 초기화 (빨간 화면 제거)
+        if (HitScreenEffect.Instance != null)
+        {
+            HitScreenEffect.Instance.SetLowHpWarning(false);
+            HitScreenEffect.Instance.Clear();
+        }
 
         // 4) 페인트 완전 초기화 (깨끗한 몸으로 부활)
         if (paintReceiver != null)

@@ -915,6 +915,7 @@ GameObject:
   - component: {fileID: 240263657}
   - component: {fileID: 240263656}
   - component: {fileID: 240263660}
+  - component: {fileID: 240263661}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -1038,6 +1039,25 @@ MonoBehaviour:
   scoreboardEntryPrefab: {fileID: 2111613705}
   timerText: {fileID: 494419824}
   stateText: {fileID: 552854622}
+--- !u!114 &240263661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 240263655}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18ae40675c9804b40a81cb48f94608e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HitScreenEffect
+  hitImage: {fileID: 0}
+  hitAlpha: 0.35
+  maxAlpha: 0.6
+  fadeTime: 0.5
+  lowHpThreshold: 0.2
+  lowHpAlpha: 0.15
+  lowHpColor: {r: 0.8, g: 0.1, b: 0.1, a: 1}
 --- !u!1 &256976436
 GameObject:
   m_ObjectHideFlags: 0

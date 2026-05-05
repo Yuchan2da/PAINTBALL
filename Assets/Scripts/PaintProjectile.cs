@@ -182,10 +182,11 @@ public class PaintProjectile : MonoBehaviour
         var health = hitObject.GetComponentInParent<MonkeyHealth>();
         if (health != null)
         {
+            float[] colorArray = { teamColor.r, teamColor.g, teamColor.b, teamColor.a };
             if (PhotonNetwork.IsConnected)
-                health.TakeDamageNetwork(damage, shooterName, isHeadshot);
+                health.TakeDamageNetwork(damage, shooterName, isHeadshot, colorArray);
             else
-                health.TakeDamage(damage, shooterName, isHeadshot);
+                health.TakeDamage(damage, shooterName, isHeadshot, teamColor);
         }
     }
 
