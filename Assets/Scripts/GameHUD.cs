@@ -65,6 +65,10 @@ public class GameHUD : MonoBehaviour
     [Tooltip("카운트다운 / 게임 오버 등 큰 텍스트")]
     public TMP_Text stateText;
 
+    [Header("크로스헤어")]
+    [Tooltip("인게임 크로스헤어 렌더러")]
+    public CrosshairRenderer crosshairRenderer;
+
     // isDirty 패턴: 이전 값과 현재 값이 다를 때만 UI 텍스트를 갱신
     private int lastAmmo   = -1;
     private int lastHp     = -1;
@@ -156,6 +160,7 @@ public class GameHUD : MonoBehaviour
         RefreshHp();
         RefreshTimer();
         HandleScoreboardToggle();
+        RefreshCrosshairMovement();
     }
 
     // ── 탄창 갱신 ─────────────────────────────────────────────────
@@ -442,6 +447,10 @@ public class GameHUD : MonoBehaviour
         lastAmmo = -1;
         lastHp   = -1;
         lastTime = -1f;
+
+        // 리스폰 시 크로스헤어 동적 오프셋 리셋
+        if (crosshairRenderer != null)
+            crosshairRenderer.ResetDynamic();
     }
 
     /// <summary>
@@ -470,5 +479,27 @@ public class GameHUD : MonoBehaviour
 
         if (hpSlider != null)
             hpSlider.gameObject.SetActive(visible && playerHealth != null);
+
+        // 크로스헤어 가시성
+        if (crosshairRenderer != null)
+            crosshairRenderer.gameObject.SetActive(visible);
+    }
+
+    // ── 크로스헤어 이동 확장 ──────────────────────────────────────
+
+    /// <summary>
+    /// 매 프레임 로컬 플레이어의 수평 속도를 크로스헤어에 전달.
+    /// CharacterController.velocity에서 Y축을 제거한 수평 속도를 사용.
+    /// </summary>
+    void RefreshCrosshairMovement()
+    {
+        if (crosshairRenderer == null || playerShooter == null) return;
+
+        var cc = playerShooter.GetComponentInParent<CharacterController>();
+        if (cc == null) return;
+
+        Vector3 vel = cc.velocity;
+        float horizontalSpeed = new Vector3(vel.x, 0f, vel.z).magnitude;
+        crosshairRenderer.OnMove(horizontalSpeed);
     }
 }

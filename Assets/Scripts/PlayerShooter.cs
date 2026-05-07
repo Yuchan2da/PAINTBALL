@@ -253,6 +253,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         // ── 건 모델 반동 ──
         if (fpsGunModel != null)
             fpsGunModel.PlayRecoil();
+
+        // ── 크로스헤어 확장 ──
+        if (GameHUD.Instance != null && GameHUD.Instance.crosshairRenderer != null)
+            GameHUD.Instance.crosshairRenderer.OnFire();
     }
 
     IEnumerator ReloadRoutine()

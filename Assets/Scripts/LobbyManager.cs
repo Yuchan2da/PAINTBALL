@@ -62,6 +62,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [SerializeField] private TMP_Text startButtonText;
     [SerializeField] private Button leaveButton;
 
+    // ───── UI: Settings Panel ──────────────────────────────────
+    [Header("Settings Panel")]
+    [SerializeField] private GameObject settingsPanel;
+    [SerializeField] private Button settingsButton;
+    [SerializeField] private Button settingsBackButton;
+
     // ───── 설정 ───────────────────────────────────────────────
     [Header("설정")]
     [SerializeField] private string gameSceneName = "SampleScene";
@@ -106,6 +112,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         BindButton(readyButton, OnReadyClicked);
         BindButton(startButton, OnStartClicked);
         BindButton(leaveButton, OnLeaveClicked);
+        BindButton(settingsButton, () => ShowPanel(settingsPanel));
+        BindButton(settingsBackButton, () => {
+            var csUI = settingsPanel != null ? settingsPanel.GetComponentInChildren<CrosshairSettingsUI>() : null;
+            if (csUI != null) csUI.SaveSettings();
+            ShowPanel(mainPanel);
+        });
 
         // 초기 패널 상태
         ShowPanel(mainPanel);
@@ -153,6 +165,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (mainPanel != null) mainPanel.SetActive(target == mainPanel);
         if (createRoomPanel != null) createRoomPanel.SetActive(target == createRoomPanel);
         if (roomPanel != null) roomPanel.SetActive(target == roomPanel);
+        if (settingsPanel != null) settingsPanel.SetActive(target == settingsPanel);
     }
 
     // ===================================================================
