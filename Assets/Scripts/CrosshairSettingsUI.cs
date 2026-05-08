@@ -62,6 +62,10 @@ public class CrosshairSettingsUI : MonoBehaviour
 
     // ── 토글 ─────────────────────────────────────────────────────
     [Header("토글")]
+    [Tooltip("조준선 전체 표시 여부")]
+    [SerializeField] private Toggle crosshairToggle;
+    [Tooltip("십자선(4개 선) 표시 여부")]
+    [SerializeField] private Toggle linesToggle;
     [Tooltip("중심 점 표시 여부")]
     [SerializeField] private Toggle dotToggle;
     [Tooltip("외곽선 표시 여부")]
@@ -85,6 +89,9 @@ public class CrosshairSettingsUI : MonoBehaviour
     // ── 내부 상태 ────────────────────────────────────────────────
     private CrosshairSettings settings;
 
+    /// <summary>LoadSettingsToUI 중 콜백 무시 플래그. 초기화 시 꼬임 방지.</summary>
+    private bool isUpdating;
+
     // ===================================================================
     //  Unity 라이프사이클
     // ===================================================================
@@ -103,6 +110,9 @@ public class CrosshairSettingsUI : MonoBehaviour
     /// <summary>슬라이더/토글에 현재 설정값을 반영하고 라벨을 갱신.</summary>
     private void LoadSettingsToUI()
     {
+        // 값 세팅 중 OnSettingChanged 콜백 무시
+        isUpdating = true;
+
         // 슬라이더: 범위 + 정수 단위 + 현재 값
         ConfigureSlider(lineLengthSlider,    1, 20, settings.lineLength);
         ConfigureSlider(lineThicknessSlider, 1, 6,  settings.lineThickness);
@@ -112,12 +122,16 @@ public class CrosshairSettingsUI : MonoBehaviour
         ConfigureSlider(dynamicAmountSlider, 1, 15, settings.dynamicAmount);
 
         // 토글: 현재 값
+        SafeSetToggle(crosshairToggle,   settings.showCrosshair);
+        SafeSetToggle(linesToggle,       settings.showLines);
         SafeSetToggle(dotToggle,         settings.showDot);
         SafeSetToggle(outlineToggle,     settings.showOutline);
         SafeSetToggle(tShapeToggle,      settings.tShape);
         SafeSetToggle(dynamicFireToggle, settings.dynamicOnFire);
         SafeSetToggle(dynamicMoveToggle, settings.dynamicOnMove);
 
+        // 모든 UI 값 세팅 완료 후 한 번만 갱신
+        isUpdating = false;
         UpdateAllLabels();
         SyncPreview();
     }
@@ -134,6 +148,8 @@ public class CrosshairSettingsUI : MonoBehaviour
         BindSliderEvent(dynamicAmountSlider);
 
         // 토글
+        BindToggleEvent(crosshairToggle);
+        BindToggleEvent(linesToggle);
         BindToggleEvent(dotToggle);
         BindToggleEvent(outlineToggle);
         BindToggleEvent(tShapeToggle);
@@ -172,6 +188,9 @@ public class CrosshairSettingsUI : MonoBehaviour
     /// </summary>
     private void OnSettingChanged()
     {
+        // LoadSettingsToUI 중에는 콜백 무시 (꼬임 방지)
+        if (isUpdating) return;
+
         // 슬라이더 → settings
         if (lineLengthSlider != null)    settings.lineLength       = lineLengthSlider.value;
         if (lineThicknessSlider != null) settings.lineThickness    = lineThicknessSlider.value;
@@ -181,6 +200,8 @@ public class CrosshairSettingsUI : MonoBehaviour
         if (dynamicAmountSlider != null) settings.dynamicAmount    = dynamicAmountSlider.value;
 
         // 토글 → settings
+        if (crosshairToggle != null)   settings.showCrosshair = crosshairToggle.isOn;
+        if (linesToggle != null)       settings.showLines     = linesToggle.isOn;
         if (dotToggle != null)         settings.showDot       = dotToggle.isOn;
         if (outlineToggle != null)     settings.showOutline   = outlineToggle.isOn;
         if (tShapeToggle != null)      settings.tShape        = tShapeToggle.isOn;
@@ -203,7 +224,7 @@ public class CrosshairSettingsUI : MonoBehaviour
         SafeSetLabel(gapLabel,           settings.gap,              "간격");
         SafeSetLabel(dotSizeLabel,       settings.dotSize,          "점 크기");
         SafeSetLabel(outlineLabel,       settings.outlineThickness, "외곽선");
-        SafeSetLabel(dynamicAmountLabel, settings.dynamicAmount,    "확장");
+        SafeSetLabel(dynamicAmountLabel, settings.dynamicAmount,    "사격/이동 확장량");
     }
 
     // ===================================================================
