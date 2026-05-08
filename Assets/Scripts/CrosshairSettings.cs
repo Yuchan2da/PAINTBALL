@@ -34,6 +34,10 @@ public class CrosshairSettings
     public bool  showOutline      = true;
     public float outlineThickness = 1f;  // 범위: 1~3
 
+    // ── 표시 옵션 ─────────────────────────────────────────────────
+    public bool showCrosshair = true;  // 크로스헤어 전체 표시
+    public bool showLines     = true;  // 십자선(4개 선) 표시 (점/외곽선은 유지)
+
     // ── T자 (윗선 제거) ──────────────────────────────────────────
     public bool tShape = false;
 

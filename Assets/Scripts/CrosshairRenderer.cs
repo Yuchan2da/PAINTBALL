@@ -129,12 +129,24 @@ public class CrosshairRenderer : MonoBehaviour
     {
         if (settings == null) settings = CrosshairSettings.Load();
 
+        // ── 전체 숨김 ──
+        if (!settings.showCrosshair)
+        {
+            HideAll();
+            return;
+        }
+
         Color color = settings.GetColor();
 
-        // ── 선 색상 ──
+        // ── 선 색상 + 표시 ──
+        bool linesVisible = settings.showLines;
         for (int i = 0; i < lineImages.Length; i++)
         {
-            if (lineImages[i] != null) lineImages[i].color = color;
+            if (lineImages[i] != null)
+            {
+                lineImages[i].color = color;
+                lineImages[i].gameObject.SetActive(linesVisible);
+            }
         }
 
         // ── 세로 선 크기 (Top, Bottom) — width=두께, height=길이 ──
@@ -146,8 +158,15 @@ public class CrosshairRenderer : MonoBehaviour
         SafeSetSize(lineRight, settings.lineLength, settings.lineThickness);
 
         // ── T자 (윗선 제거) ──
-        SafeSetActive(lineTop, !settings.tShape);
-        SafeSetActive(outTop,  !settings.tShape && settings.showOutline);
+        if (settings.tShape)
+        {
+            SafeSetActive(lineTop, false);
+            SafeSetActive(outTop,  false);
+        }
+        else if (linesVisible)
+        {
+            SafeSetActive(lineTop, true);
+        }
 
         // ── 점 ──
         SafeSetActive(dot, settings.showDot);
@@ -160,7 +179,9 @@ public class CrosshairRenderer : MonoBehaviour
         {
             if (outlineImages[i] != null)
             {
-                outlineImages[i].gameObject.SetActive(showOut);
+                // 외곽선은 선이 보이는 때만 표시
+                bool outVisible = showOut && linesVisible;
+                outlineImages[i].gameObject.SetActive(outVisible);
                 outlineImages[i].color = Color.black;
             }
         }
@@ -184,6 +205,17 @@ public class CrosshairRenderer : MonoBehaviour
         }
 
         RefreshPositions();
+    }
+
+    /// <summary>크로스헤어 전체 숨김 (showCrosshair=false).</summary>
+    private void HideAll()
+    {
+        for (int i = 0; i < lineImages.Length; i++)
+            if (lineImages[i] != null) lineImages[i].gameObject.SetActive(false);
+        for (int i = 0; i < outlineImages.Length; i++)
+            if (outlineImages[i] != null) outlineImages[i].gameObject.SetActive(false);
+        SafeSetActive(dot, false);
+        SafeSetActive(outDot, false);
     }
 
     // ===================================================================
