@@ -437,8 +437,10 @@ public class GameHUD : MonoBehaviour
             if (tmp != null)
             {
                 string rank = "#" + (i + 1);
-                tmp.text = string.Format("  {0,-4} {1,-20} {2,4}    {3,4}",
-                    rank, score.playerName, score.kills, score.deaths);
+                string colorTag = BuildColorTag(score.playerName);
+
+                tmp.text = string.Format("  {0,-4} {1} {2,-18} {3,4}    {4,4}",
+                    rank, colorTag, score.playerName, score.kills, score.deaths);
 
                 // 자기 행은 밝은 노란색
                 tmp.color = isMe ? new Color(1f, 0.85f, 0.3f) : Color.white;
@@ -452,6 +454,49 @@ public class GameHUD : MonoBehaviour
                     img.color = new Color(1f, 0.85f, 0.3f, 0.12f);
             }
         }
+    }
+
+    /// <summary>
+    /// 플레이어 이름으로 페인트 색상 태그(TMP Rich Text)를 생성한다.
+    /// Photon CustomProperties에서 실제 팀 색상("tc")을 읽어온다.
+    /// </summary>
+    string BuildColorTag(string playerName)
+    {
+        Color paintColor = GetPlayerTeamColor(playerName);
+        string hex = ColorUtility.ToHtmlStringRGB(paintColor);
+        return $"<color=#{hex}>\u25a0</color>";
+    }
+
+    /// <summary>
+    /// 플레이어 이름으로 실제 팀 색상을 가져온다.
+    /// 우선순위: tc(팀컬러 RGBA) → pc(팔레트 인덱스) → 회색 폴백.
+    /// </summary>
+    Color GetPlayerTeamColor(string playerName)
+    {
+        var player = FindPhotonPlayer(playerName);
+        if (player == null) return Color.gray;
+
+        // 1순위: PlayerShooter가 동기화하는 실제 RGBA
+        if (player.CustomProperties.TryGetValue("tc", out object tcVal) && tcVal is float[] c)
+            return new Color(c[0], c[1], c[2], c[3]);
+
+        // 2순위: 로비에서 선택한 팔레트 인덱스
+        return ColorSelectUI.GetPlayerColor(player);
+    }
+
+    /// <summary>
+    /// 닉네임으로 Photon Player를 찾는다.
+    /// </summary>
+    Photon.Realtime.Player FindPhotonPlayer(string nickName)
+    {
+        if (!Photon.Pun.PhotonNetwork.InRoom) return null;
+
+        foreach (var p in Photon.Pun.PhotonNetwork.PlayerList)
+        {
+            if (p.NickName == nickName)
+                return p;
+        }
+        return null;
     }
 
     // ── 게임 상태 변경 이벤트 핸들러 ─────────────────────────────
