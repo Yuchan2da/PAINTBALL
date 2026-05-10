@@ -260,12 +260,70 @@ public class PlayerController : MonoBehaviourPun
             + characterController.center
             - new Vector3(0f, halfHeight - 0.02f, 0f);
 
-        GameObject decal = ObjectPoolManager.Instance.GetDecal();
-        if (decal == null) return; // 풀 소진 안전장치
+        // 자기 페인트 색 가져오기
+        var shooter = GetComponent<PlayerShooter>();
+        Color penaltyColor = (shooter != null) ? shooter.teamColor : Color.white;
 
-        decal.transform.position = footPosition;
-        // 바닥에 눕히기: Quad 앞면(-Z)이 위(+Y)를 향하도록
+        // 폭탄 먼저 소환 → 착지 시 데칼 + 데미지 적용 (콜백)
+        PenaltyBomb.Spawn(footPosition, penaltyColor, () =>
+        {
+            // 착지 시 데칼 생성
+            SpawnPenaltyDecalAt(footPosition, penaltyColor);
+
+            // 착지 시 자기 데미지 (5 dmg)
+            var health = GetComponent<MonkeyHealth>();
+            if (health != null && health.CurrentHp > 0)
+            {
+                health.TakeDamage(5, "", false);
+            }
+        });
+
+        // 네트워크 동기화: 다른 플레이어에게도 폭탄 + 데칼 표시
+        if (photonView != null && PhotonNetwork.IsConnected)
+        {
+            float[] colorArr = { penaltyColor.r, penaltyColor.g, penaltyColor.b, penaltyColor.a };
+            photonView.RPC(nameof(RPC_SpawnPenaltyDecal), RpcTarget.Others,
+                           footPosition, colorArr);
+        }
+    }
+
+    /// <summary>
+    /// 원격 클라이언트에서 수신: 패널티 폭탄 + 착지 시 데칼 생성.
+    /// </summary>
+    [PunRPC]
+    void RPC_SpawnPenaltyDecal(Vector3 position, float[] color)
+    {
+        Color c = new Color(color[0], color[1], color[2], color[3]);
+        PenaltyBomb.Spawn(position, c, () =>
+        {
+            SpawnPenaltyDecalAt(position, c);
+        });
+    }
+
+    /// <summary>
+    /// 패널티 데칼을 실제로 생성하는 공통 메서드 (로컬 + RPC 공용).
+    /// </summary>
+    void SpawnPenaltyDecalAt(Vector3 position, Color penaltyColor)
+    {
+        if (ObjectPoolManager.Instance == null) return;
+
+        GameObject decal = ObjectPoolManager.Instance.GetDecal();
+        if (decal == null) return;
+
+        decal.transform.position = position;
         decal.transform.rotation = Quaternion.FromToRotation(-Vector3.forward, Vector3.up);
+
+        // 크기 확대: DecalProjector.size로 제어
+        var projector = decal.GetComponent<UnityEngine.Rendering.Universal.DecalProjector>();
+        if (projector != null)
+        {
+            projector.size = new Vector3(3f, 3f, projector.size.z);
+        }
+
+        // 색상 적용
+        var paintDecal = decal.GetComponent<PaintDecal>();
+        if (paintDecal != null)
+            paintDecal.SetColor(penaltyColor);
     }
 
     // ── 카메라 반동 ───────────────────────────────────────────────
