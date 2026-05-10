@@ -51,9 +51,10 @@ public static class DecalTintCache
 
     static void Initialize()
     {
-        // Resources가 아닌 직접 경로로 로드 (에디터/빌드 모두 지원)
-        RegisterColor(new Color(1, 0, 0, 1), "PaintDecal_Team0_Red");
-        RegisterColor(new Color(0, 0, 1, 1), "PaintDecal_Team1_Blue");
+        // 모든 색상을 동일한 베이스 텍스처 기반 런타임 생성으로 통일.
+        // 사전 생성 머티리얼은 텍스처/모양이 달라 일관성을 해치므로 비활성화.
+        // RegisterColor(new Color(1, 0, 0, 1), "PaintDecal_Team0_Red");
+        // RegisterColor(new Color(0, 0, 1, 1), "PaintDecal_Team1_Blue");
     }
 
     static void RegisterColor(Color color, string materialName)
