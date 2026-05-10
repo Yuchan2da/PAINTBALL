@@ -46,7 +46,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [Header("CreateRoom Panel")]
     [SerializeField] private GameObject createRoomPanel;
     [SerializeField] private TMP_InputField roomNameInput;
-    [SerializeField] private TMP_Dropdown maxPlayersDropdown;
+    // 최대 인원 선택기 (◀ 값 ▶ 버튼 방식, 씬의 MaxPlayersSelector에서 자동 탐색)
+    private TMP_Text maxPlayersValueText;
+    private int selectedMaxPlayersIndex = 2; // 0→2명, 1→3명, 2→4명
+    private readonly int[] maxPlayersOptions = { 2, 3, 4 };
     [SerializeField] private Button confirmCreateButton;
     [SerializeField] private Button cancelCreateButton;
 
@@ -124,7 +127,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         SetStatus("닉네임을 입력하고 방을 만들거나 참가하세요.");
 
         // 맥스 플레이어 드롭다운 초기화
-        InitDropdown();
+        InitMaxPlayersSelector();
     }
 
     void OnDestroy()
@@ -143,14 +146,65 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (btn != null) btn.onClick.AddListener(action);
     }
 
-    /// <summary>최대 인원 드롭다운 초기화.</summary>
-    private void InitDropdown()
+    /// <summary>
+    /// 최대 인원 버튼 셀렉터 초기화.
+    /// 씬의 MaxPlayersSelector 오브젝트에서 ◀ / 값 / ▶ 요소를 찾아 연결한다.
+    /// </summary>
+    private void InitMaxPlayersSelector()
     {
-        if (maxPlayersDropdown == null) return;
-        maxPlayersDropdown.ClearOptions();
-        maxPlayersDropdown.AddOptions(new List<string> { "2명", "3명", "4명" });
-        maxPlayersDropdown.value = 2; // 기본 4명
+        if (createRoomPanel == null) return;
+
+        var selector = createRoomPanel.transform.Find("MaxPlayersSelector");
+        if (selector == null)
+        {
+            Debug.LogWarning("[Lobby] MaxPlayersSelector not found in CreateRoomPanel");
+            return;
+        }
+
+        // 중앙 값 텍스트
+        var valueTf = selector.Find("ValueText");
+        if (valueTf != null)
+            maxPlayersValueText = valueTf.GetComponent<TMP_Text>();
+
+        // ◀ 버튼
+        var leftTf = selector.Find("LeftBtn");
+        if (leftTf != null)
+        {
+            var btn = leftTf.GetComponent<Button>();
+            if (btn != null) btn.onClick.AddListener(OnMaxPlayersLeft);
+        }
+
+        // ▶ 버튼
+        var rightTf = selector.Find("RightBtn");
+        if (rightTf != null)
+        {
+            var btn = rightTf.GetComponent<Button>();
+            if (btn != null) btn.onClick.AddListener(OnMaxPlayersRight);
+        }
+
+        // 기본값 적용 (4명)
+        selectedMaxPlayersIndex = 2;
+        RefreshMaxPlayersDisplay();
     }
+
+    private void OnMaxPlayersLeft()
+    {
+        selectedMaxPlayersIndex = Mathf.Max(0, selectedMaxPlayersIndex - 1);
+        RefreshMaxPlayersDisplay();
+    }
+
+    private void OnMaxPlayersRight()
+    {
+        selectedMaxPlayersIndex = Mathf.Min(maxPlayersOptions.Length - 1, selectedMaxPlayersIndex + 1);
+        RefreshMaxPlayersDisplay();
+    }
+
+    private void RefreshMaxPlayersDisplay()
+    {
+        if (maxPlayersValueText != null)
+            maxPlayersValueText.text = maxPlayersOptions[selectedMaxPlayersIndex] + "명";
+    }
+
 
     // ===================================================================
     //  패널 전환
@@ -232,7 +286,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
 
         // 맥스 플레이어 (드롭다운 index 0→2명, 1→3명, 2→4명)
-        int maxPlayers = maxPlayersDropdown != null ? maxPlayersDropdown.value + 2 : 4;
+        int maxPlayers = maxPlayersOptions[selectedMaxPlayersIndex];
 
         // 서버 연결 후 방 생성
         if (!PhotonNetwork.IsConnected)
@@ -589,10 +643,19 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (roomTitleText != null)
             roomTitleText.text = PhotonNetwork.CurrentRoom.Name;
 
-        // 플레이어 슬롯 갱신
+        // 플레이어 슬롯 갱신 (방 최대인원에 맞춰 초과 슬롯 숨김)
         Player[] players = PhotonNetwork.PlayerList;
+        int maxPlayers = PhotonNetwork.CurrentRoom.MaxPlayers;
+
         for (int i = 0; i < playerSlotTexts.Length; i++)
         {
+            // 방 최대인원 초과 슬롯은 완전 숨김
+            if (i >= maxPlayers)
+            {
+                HidePlayerSlot(i);
+                continue;
+            }
+
             if (i < players.Length)
             {
                 UpdatePlayerSlot(i, players[i]);
@@ -658,6 +721,16 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             playerReadyTexts[index].text = "";
             playerReadyTexts[index].gameObject.SetActive(false);
         }
+    }
+
+    /// <summary>방 최대인원 초과 슬롯을 완전히 숨긴다.</summary>
+    private void HidePlayerSlot(int index)
+    {
+        if (index < playerSlotTexts.Length && playerSlotTexts[index] != null)
+            playerSlotTexts[index].gameObject.SetActive(false);
+
+        if (index < playerReadyTexts.Length && playerReadyTexts[index] != null)
+            playerReadyTexts[index].gameObject.SetActive(false);
     }
 
     /// <summary>시작 버튼 상태 갱신 (방장 전용).</summary>
