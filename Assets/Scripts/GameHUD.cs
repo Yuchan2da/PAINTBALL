@@ -23,15 +23,29 @@ public class GameHUD : MonoBehaviour
 {
     public static GameHUD Instance { get; private set; }
 
-    [Header("탄창 HUD")]
-    [Tooltip("탄창 수를 표시할 TextMeshPro 컴포넌트")]
+    [Header("탄창 HUD (레거시 — 비활성 폴백용)")]
+    [Tooltip("탄창 수를 표시할 TextMeshPro 컴포넌트 (레거시)")]
     public TMP_Text ammoText;
 
-    [Header("체력 HUD")]
-    [Tooltip("체력 수치를 표시할 TextMeshPro 컴포넌트")]
+    [Header("탄창 HUD — 총알 아이콘")]
+    [Tooltip("총알 아이콘들의 부모 컨테이너 (HorizontalLayoutGroup)")]
+    public Transform ammoContainer;
+    [Tooltip("재장전 중 표시 텍스트")]
+    public TMP_Text reloadText;
+
+    [Header("체력 HUD (레거시 — 비활성 폴백용)")]
+    [Tooltip("체력 수치를 표시할 TextMeshPro 컴포넌트 (레거시)")]
     public TMP_Text hpText;
-    [Tooltip("체력 슬라이더 (선택). 비워두면 텍스트만 표시")]
+    [Tooltip("체력 슬라이더 (레거시)")]
     public Slider hpSlider;
+
+    [Header("체력 HUD — HP 바")]
+    [Tooltip("메인 HP 바 (Image.fillAmount 사용)")]
+    public Image hpBarFill;
+    [Tooltip("데미지 잔상 바 (천천히 따라옴)")]
+    public Image hpBarDamage;
+    [Tooltip("HP 바 위 숫자 표시")]
+    public TMP_Text hpBarLabel;
 
     [Header("연결 대상 (런타임 자동 등록)")]
     [Tooltip("로컬 플레이어의 PlayerShooter. RegisterLocalPlayer()로 자동 설정됨")]
@@ -74,6 +88,12 @@ public class GameHUD : MonoBehaviour
     private int lastHp     = -1;
     private float lastTime = -1f;
 
+    // 총알 아이콘 캐시
+    private Image[] bulletIcons;
+
+    // HP 바 데미지 잔상 추적
+    private float damageBarTarget = 1f;
+
     // 킬 피드 큐
     private Queue<GameObject> killFeedQueue = new Queue<GameObject>();
 
@@ -85,13 +105,16 @@ public class GameHUD : MonoBehaviour
 
     void Start()
     {
-        // HP 슬라이더 초기 범위 설정
+        // HP 슬라이더 초기 범위 설정 (레거시)
         if (hpSlider != null && playerHealth != null)
         {
             hpSlider.minValue = 0;
             hpSlider.maxValue = playerHealth.maxHp;
             hpSlider.value    = playerHealth.maxHp;
         }
+
+        // 총알 아이콘 캐싱
+        CacheBulletIcons();
 
         // 점수판 기본 숨김
         if (scoreboardPanel != null)
@@ -130,13 +153,22 @@ public class GameHUD : MonoBehaviour
         playerShooter = shooter;
         playerHealth = health;
 
-        // HP 슬라이더 초기화
+        // HP 슬라이더 초기화 (레거시)
         if (hpSlider != null && playerHealth != null)
         {
             hpSlider.minValue = 0;
             hpSlider.maxValue = playerHealth.maxHp;
             hpSlider.value    = playerHealth.maxHp;
         }
+
+        // 총알 아이콘 캐싱 (Start보다 늦게 호출될 수 있음)
+        if (bulletIcons == null || bulletIcons.Length == 0)
+            CacheBulletIcons();
+
+        // HP 바 초기화
+        if (hpBarFill != null) hpBarFill.fillAmount = 1f;
+        if (hpBarDamage != null) hpBarDamage.fillAmount = 1f;
+        damageBarTarget = 1f;
 
         ForceRefresh();
     }
@@ -163,50 +195,126 @@ public class GameHUD : MonoBehaviour
         RefreshCrosshairMovement();
     }
 
-    // ── 탄창 갱신 ─────────────────────────────────────────────────
+    // ── 총알 아이콘 캐싱 ───────────────────────────────────────────
+
+    void CacheBulletIcons()
+    {
+        if (ammoContainer == null) return;
+
+        int count = ammoContainer.childCount;
+        bulletIcons = new Image[count];
+        for (int i = 0; i < count; i++)
+        {
+            bulletIcons[i] = ammoContainer.GetChild(i).GetComponent<Image>();
+        }
+    }
+
+    // ── 탄창 갱신 (총알 아이콘) ────────────────────────────────────
 
     void RefreshAmmo()
     {
-        if (playerShooter == null || ammoText == null) return;
+        if (playerShooter == null) return;
 
-        // 재장전 중이면 별도 표시
+        // 재장전 중 표시
         if (playerShooter.IsReloading)
         {
-            if (lastAmmo != -2) // 이미 표시 중이면 스킵
+            if (lastAmmo != -2)
             {
                 lastAmmo = -2;
-                ammoText.text = "RELOADING...";
-                ammoText.color = Color.yellow;
+                // 총알 아이콘 전부 반투명
+                if (bulletIcons != null)
+                {
+                    for (int i = 0; i < bulletIcons.Length; i++)
+                    {
+                        if (bulletIcons[i] != null)
+                            bulletIcons[i].color = new Color(0.3f, 0.85f, 1f, 0.15f);
+                    }
+                }
+                if (reloadText != null) reloadText.gameObject.SetActive(true);
             }
             return;
         }
 
         int current = playerShooter.CurrentAmmo;
-        if (current == lastAmmo) return; // 변화 없으면 스킵
+        if (current == lastAmmo) return;
 
         lastAmmo = current;
-        ammoText.text = current + " / " + playerShooter.MaxAmmo;
+        if (reloadText != null) reloadText.gameObject.SetActive(false);
 
-        // 탄창이 5발 이하면 빨간색으로 경고
-        ammoText.color = current <= 5 ? Color.red : Color.white;
+        // 총알 아이콘 표시/숨김
+        if (bulletIcons != null)
+        {
+            for (int i = 0; i < bulletIcons.Length; i++)
+            {
+                if (bulletIcons[i] == null) continue;
+
+                if (i < current)
+                {
+                    // 남은 총알: 밝게
+                    bulletIcons[i].color = current <= 5
+                        ? new Color(1f, 0.3f, 0.2f, 0.95f) // 빨간색 경고
+                        : new Color(0.3f, 0.85f, 1f, 0.95f); // 하늘색
+                }
+                else
+                {
+                    // 소모된 총알: 거의 투명
+                    bulletIcons[i].color = new Color(0.3f, 0.3f, 0.3f, 0.15f);
+                }
+            }
+        }
+
+        // 레거시 텍스트 폴백
+        if (ammoText != null && ammoText.gameObject.activeInHierarchy)
+        {
+            ammoText.text = current + " / " + playerShooter.MaxAmmo;
+            ammoText.color = current <= 5 ? Color.red : Color.white;
+        }
     }
 
-    // ── 체력 갱신 ─────────────────────────────────────────────────
+    // ── 체력 갱신 (HP 바) ──────────────────────────────────────────
 
     void RefreshHp()
     {
         if (playerHealth == null) return;
 
         int current = playerHealth.CurrentHp;
-        if (current == lastHp) return; // 변화 없으면 스킵
+        float ratio = (float)current / playerHealth.maxHp;
 
-        lastHp = current;
+        // ── HP 바 갱신 ──
+        if (hpBarFill != null)
+        {
+            hpBarFill.fillAmount = ratio;
 
-        if (hpText != null)
+            // 초록 → 노랑 → 빨강 그라데이션
+            if (ratio > 0.5f)
+                hpBarFill.color = Color.Lerp(Color.yellow, new Color(0.2f, 0.9f, 0.3f), (ratio - 0.5f) * 2f);
+            else
+                hpBarFill.color = Color.Lerp(Color.red, Color.yellow, ratio * 2f);
+        }
+
+        // ── 데미지 잔상 바 (빨간 바가 천천히 따라옴) ──
+        if (hpBarDamage != null)
+        {
+            if (ratio < damageBarTarget)
+                damageBarTarget = ratio; // 타겟 갱신 (HP 감소 시)
+
+            // 아직 잔상이 메인보다 크면 천천히 줄임
+            if (hpBarDamage.fillAmount > ratio)
+                hpBarDamage.fillAmount = Mathf.Lerp(hpBarDamage.fillAmount, ratio, Time.deltaTime * 3f);
+            else
+                hpBarDamage.fillAmount = ratio;
+        }
+
+        // ── HP 라벨 ──
+        if (hpBarLabel != null && current != lastHp)
+        {
+            hpBarLabel.text = current + " / " + playerHealth.maxHp;
+        }
+
+        // 레거시 텍스트 폴백
+        if (current != lastHp && hpText != null && hpText.gameObject.activeInHierarchy)
         {
             hpText.text = "HP  " + current + " / " + playerHealth.maxHp;
-
-            float ratio = (float)current / playerHealth.maxHp;
             hpText.color = ratio > 0.5f ? Color.green
                          : ratio > 0.25f ? Color.yellow
                          : Color.red;
@@ -214,6 +322,8 @@ public class GameHUD : MonoBehaviour
 
         if (hpSlider != null)
             hpSlider.value = current;
+
+        lastHp = current;
     }
 
     // ── 라운드 타이머 갱신 ────────────────────────────────────────
@@ -246,8 +356,28 @@ public class GameHUD : MonoBehaviour
         var tmp = entry.GetComponent<TMP_Text>();
         if (tmp != null)
         {
-            string headshot = isHeadshot ? " [HEADSHOT]" : "";
-            tmp.text = killer + " >> " + victim + headshot;
+            // 로컬 플레이어 이름 판별
+            string localName = Photon.Pun.PhotonNetwork.IsConnected
+                ? Photon.Pun.PhotonNetwork.NickName : "Player";
+            bool isMyKill = killer == localName;
+
+            if (isHeadshot)
+            {
+                // 헤드샷 킬: 빨간 강조
+                tmp.text = killer + " >> " + victim + " <color=#FF4444>[HEADSHOT]</color>";
+                tmp.color = new Color(1f, 0.7f, 0.7f); // 연한 빨강 기본
+            }
+            else if (isMyKill)
+            {
+                // 내 킬: 노란색 강조
+                tmp.text = "<color=#FFD700>" + killer + "</color> >> " + victim;
+                tmp.color = Color.white;
+            }
+            else
+            {
+                tmp.text = killer + " >> " + victim;
+                tmp.color = new Color(0.85f, 0.85f, 0.85f); // 기본 연한 회색
+            }
         }
 
         killFeedQueue.Enqueue(entry);
@@ -288,6 +418,10 @@ public class GameHUD : MonoBehaviour
             Destroy(child.gameObject);
         }
 
+        // 로컬 플레이어 이름
+        string localName = Photon.Pun.PhotonNetwork.IsConnected
+            ? Photon.Pun.PhotonNetwork.NickName : "Player";
+
         // 순위 데이터 가져오기
         var ranking = ScoreManager.Instance.GetRanking();
 
@@ -296,13 +430,26 @@ public class GameHUD : MonoBehaviour
             var score = ranking[i];
             GameObject entry = Instantiate(scoreboardEntryPrefab, scoreboardContent);
             entry.SetActive(true);
+
+            bool isMe = score.playerName == localName;
+
             var tmp = entry.GetComponent<TMP_Text>();
             if (tmp != null)
             {
                 string rank = "#" + (i + 1);
-                tmp.text = rank + "  " + score.playerName
-                         + "  |  K: " + score.kills
-                         + "  D: " + score.deaths;
+                tmp.text = string.Format("  {0,-4} {1,-20} {2,4}    {3,4}",
+                    rank, score.playerName, score.kills, score.deaths);
+
+                // 자기 행은 밝은 노란색
+                tmp.color = isMe ? new Color(1f, 0.85f, 0.3f) : Color.white;
+            }
+
+            // 자기 행 배경 강조
+            if (isMe)
+            {
+                var img = entry.GetComponent<Image>();
+                if (img != null)
+                    img.color = new Color(1f, 0.85f, 0.3f, 0.12f);
             }
         }
     }
@@ -333,6 +480,9 @@ public class GameHUD : MonoBehaviour
 
             case GameManager.GameState.Countdown:
                 SetHudVisible(true);          // HP, Ammo 표시
+                // 카운트다운 중에는 크로스헤어 숨김 (Playing에서 표시)
+                if (crosshairRenderer != null)
+                    crosshairRenderer.gameObject.SetActive(false);
                 ShowStateText("READY...");
                 if (timerText != null) timerText.gameObject.SetActive(false);
 
@@ -471,14 +621,43 @@ public class GameHUD : MonoBehaviour
     /// </summary>
     void SetHudVisible(bool visible)
     {
+        // 레거시 텍스트 (항상 비활성 — 새 HUD 사용)
         if (ammoText != null)
-            ammoText.gameObject.SetActive(visible && playerShooter != null);
+            ammoText.gameObject.SetActive(false);
 
         if (hpText != null)
-            hpText.gameObject.SetActive(visible && playerHealth != null);
+            hpText.gameObject.SetActive(false);
 
         if (hpSlider != null)
-            hpSlider.gameObject.SetActive(visible && playerHealth != null);
+            hpSlider.gameObject.SetActive(false);
+
+        // ── 새 HUD: visible이면 무조건 보이고, 내용은 Update에서 채움 ──
+        if (ammoContainer != null)
+            ammoContainer.gameObject.SetActive(visible);
+
+        if (reloadText != null && !visible)
+            reloadText.gameObject.SetActive(false);
+
+        // HP 바 컨테이너 (HpBarFill의 최상위 부모 = HpBarContainer)
+        if (hpBarFill != null)
+        {
+            // HpBarFill → HpBarContainer(parent.parent) 안전 접근
+            Transform container = hpBarFill.transform.parent;
+            if (container != null) container = container.parent;
+            if (container != null)
+                container.gameObject.SetActive(visible);
+        }
+
+        // HP 바 리셋 (부활 시)
+        if (visible && playerHealth != null)
+        {
+            float ratio = (float)playerHealth.CurrentHp / playerHealth.maxHp;
+            if (hpBarFill != null) hpBarFill.fillAmount = ratio;
+            if (hpBarDamage != null) hpBarDamage.fillAmount = ratio;
+            damageBarTarget = ratio;
+            lastHp = -1;
+            lastAmmo = -1;
+        }
 
         // 크로스헤어 가시성
         if (crosshairRenderer != null)
