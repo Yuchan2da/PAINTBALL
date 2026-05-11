@@ -88,6 +88,10 @@ public class GameManager : MonoBehaviourPunCallbacks
             return;
         }
         Instance = this;
+
+        // Room Properties에서 게임 설정 로드 → roundDuration 등 적용
+        GameSettings.LoadFromRoom();
+        roundDuration = GameSettings.Current.roundDuration;
     }
 
     void Start()

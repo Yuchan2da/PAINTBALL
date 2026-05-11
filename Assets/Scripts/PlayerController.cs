@@ -132,6 +132,9 @@ public class PlayerController : MonoBehaviourPun
         // 패널티 기준점을 시작 위치로 초기화
         penaltyCheckPosition = transform.position;
         penaltyTimer = 0f;
+
+        // GameSettings에서 정지 패널티 설정 적용
+        penaltyInterval = GameSettings.Current.idlePenaltyDelay;
     }
 
     void Update()
@@ -270,11 +273,11 @@ public class PlayerController : MonoBehaviourPun
             // 착지 시 데칼 생성
             SpawnPenaltyDecalAt(footPosition, penaltyColor);
 
-            // 착지 시 자기 데미지 (5 dmg)
+            // 착지 시 자기 데미지 (GameSettings에서 읽음)
             var health = GetComponent<MonkeyHealth>();
             if (health != null && health.CurrentHp > 0)
             {
-                health.TakeDamage(5, "", false);
+                health.TakeDamage(GameSettings.Current.idlePenaltyDamage, "", false);
             }
         });
 

@@ -60,6 +60,9 @@ public class PaintZone : MonoBehaviour
 
     void Init()
     {
+        // GameSettings에서 수류탄 DPS 적용
+        damagePerSecond = GameSettings.Current.grenadeDPS;
+
         // SphereCollider (Trigger) — 데미지 판정용
         zoneCollider = gameObject.AddComponent<SphereCollider>();
         zoneCollider.isTrigger = true;

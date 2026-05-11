@@ -46,6 +46,7 @@ MonoBehaviour:
   - RPC_RemoteDie
   - RPC_RemoteRespawn
   - RPC_SpawnPenaltyDecal
+  - RPC_Explode
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

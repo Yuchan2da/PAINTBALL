@@ -64,6 +64,8 @@ public class MonkeyHealth : MonoBehaviourPun
 
     void Start()
     {
+        // GameSettings에서 체력 설정 적용
+        maxHp = GameSettings.Current.maxHealth;
         CurrentHp = maxHp;
 
         // 컴포넌트 캐싱

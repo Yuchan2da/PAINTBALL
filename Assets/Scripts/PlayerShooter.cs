@@ -97,6 +97,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         if (photonView != null)
             isLocalPlayer = photonView.IsMine;
 
+        // GameSettings에서 무기/수류탄 설정 적용
+        maxAmmo = GameSettings.Current.magazineSize;
+        maxGrenades = GameSettings.Current.grenadeCount;
+
         CurrentAmmo = maxAmmo;
         CurrentGrenades = maxGrenades;
         CacheHitboxColliders();
