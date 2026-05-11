@@ -613,6 +613,11 @@ public class GameHUD : MonoBehaviour
             case GameManager.GameState.GameOver:
                 SetHudVisible(false);         // HP, Ammo 숨김
                 if (timerText != null) timerText.gameObject.SetActive(false);
+
+                // ★ 피격 오버레이 즉시 제거 (결과 UI가 가려지는 것 방지)
+                if (HitScreenEffect.Instance != null)
+                    HitScreenEffect.Instance.Clear();
+
                 // OnGameOver에서 결과 텍스트 표시
                 break;
         }
@@ -632,6 +637,12 @@ public class GameHUD : MonoBehaviour
     /// </summary>
     void ShowGameOverUI(string winnerName)
     {
+        // ★ HitScreenEffect 오버레이 제거 —
+        //   런타임에 생성된 전체화면 Image가 Canvas 최상위에 있으므로
+        //   이것이 StateText/ScoreboardPanel 위에 렌더링되어 UI를 가린다.
+        if (HitScreenEffect.Instance != null)
+            HitScreenEffect.Instance.Clear();
+
         ShowStateText("GAME OVER!\n#1: " + winnerName);
 
         // 승리 텍스트를 화면 상단으로 이동 (스코어보드와 겹침 방지)
@@ -648,6 +659,9 @@ public class GameHUD : MonoBehaviour
             // 텍스트 크기 강조
             stateText.fontSize = 48f;
             stateText.fontStyle = FontStyles.Bold;
+
+            // ★ StateText를 Canvas 맨 앞으로 이동 (HitVignetteOverlay 위)
+            stateText.transform.SetAsLastSibling();
         }
 
         // 점수판 자동 표시
@@ -664,6 +678,11 @@ public class GameHUD : MonoBehaviour
                 sbRt.anchorMax = new Vector2(0.5f, 0.35f);
                 sbRt.anchoredPosition = Vector2.zero;
             }
+
+            // ★ ScoreboardPanel도 Canvas 맨 앞으로 (StateText 바로 아래)
+            scoreboardPanel.transform.SetAsLastSibling();
+            // StateText를 다시 최상위로 (ScoreboardPanel보다 위)
+            if (stateText != null) stateText.transform.SetAsLastSibling();
         }
         else
         {
