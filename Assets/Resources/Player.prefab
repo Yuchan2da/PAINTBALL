@@ -253,6 +253,9 @@ MonoBehaviour:
   fireCooldown: 0.11
   maxAmmo: 15
   reloadTime: 2.5
+  maxGrenades: 1
+  throwForce: 15
+  throwUpForce: 3
   inputEnabled: 1
   isLocalPlayer: 1
 --- !u!114 &4052026267127881111

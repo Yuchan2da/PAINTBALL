@@ -45,10 +45,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
     [Header("수류탄")]
     [Tooltip("시작 시 보유 수류탄 개수")]
     public int maxGrenades = 1;
-    [Tooltip("투척 힘")]
-    public float throwForce = 15f;
+    [Tooltip("투척 힘 (7 = 약 6~8m 거리)")]
+    public float throwForce = 7f;
     [Tooltip("위쪽 보정 힘")]
-    public float throwUpForce = 3f;
+    public float throwUpForce = 2.5f;
 
     public int CurrentAmmo { get; private set; }
     public int MaxAmmo => maxAmmo;

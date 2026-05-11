@@ -44,7 +44,7 @@ public class RoomSettingsUI : MonoBehaviour
         new SettingDef { label = "패널티 시간",   suffix = "초", min = 3,   max = 15,  step = 1,  defaultValue = 5,   isInt = false },
         new SettingDef { label = "패널티 데미지", suffix = "",   min = 1,   max = 20,  step = 1,  defaultValue = 5,   isInt = true  },
         new SettingDef { label = "수류탄 개수",   suffix = "개", min = 0,   max = 5,   step = 1,  defaultValue = 1,   isInt = true  },
-        new SettingDef { label = "수류탄 존 DPS", suffix = "",   min = 5,   max = 30,  step = 5,  defaultValue = 10,  isInt = false },
+        new SettingDef { label = "수류탄 시작DPS", suffix = "",   min = 5,   max = 30,  step = 5,  defaultValue = 10,  isInt = false },
     };
 
     // ─── 런타임 ───────────────────────────────────────────────────

@@ -7,7 +7,7 @@ using Photon.Pun;
 ///
 /// [생명주기]
 /// 1. PlayerShooter.ThrowGrenade()에서 Instantiate + AddForce
-/// 2. 포물선 비행 (Rigidbody 물리)
+/// 2. 포물선 비행 (Rigidbody 물리, CCD로 벽 관통 방지)
 /// 3. fuseTime(2초) 후 기폭 → RPC로 모든 클라이언트에 폭발 전파
 /// 4. 폭발 지점에 PaintZone 생성 → 자신은 파괴
 ///
@@ -26,6 +26,7 @@ public class PaintGrenade : MonoBehaviourPun
     float timer;
     bool hasExploded;
     int ownerViewID;
+    Rigidbody rb;
 
     // ─── 초기화 ───────────────────────────────────────────────────
 
@@ -39,6 +40,28 @@ public class PaintGrenade : MonoBehaviourPun
                                   (float)data[2], (float)data[3]);
             ownerViewID = (int)data[4];
         }
+
+        // Rigidbody 물리 설정: CCD로 벽 관통 방지 + 적절한 드래그
+        rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.linearDamping = 0.5f;         // 공기저항 → 너무 멀리 안 날아감
+            rb.angularDamping = 1f;          // 회전 감쇠
+        }
+
+        // 바운스 최소화 (벽에 과도하게 튀지 않게)
+        var col = GetComponent<Collider>();
+        if (col != null)
+        {
+            var physMat = new PhysicsMaterial("GrenadeMat");
+            physMat.bounciness = 0.15f;
+            physMat.dynamicFriction = 0.6f;
+            physMat.staticFriction = 0.6f;
+            physMat.bounceCombine = PhysicsMaterialCombine.Minimum;
+            physMat.frictionCombine = PhysicsMaterialCombine.Average;
+            col.material = physMat;
+        }
     }
 
     void Update()
@@ -49,6 +72,18 @@ public class PaintGrenade : MonoBehaviourPun
         timer += Time.deltaTime;
         if (timer >= fuseTime && !hasExploded)
             Explode();
+    }
+
+    // ─── 충돌 시 속도 대폭 감소 (바운스 느낌) ────────────────────
+
+    void OnCollisionEnter(Collision collision)
+    {
+        // 벽/바닥에 부딪히면 속도를 30%로 줄여 자연스럽게 굴러가게
+        if (rb != null)
+        {
+            rb.linearVelocity *= 0.3f;
+            rb.angularVelocity *= 0.5f;
+        }
     }
 
     // ─── 기폭 ─────────────────────────────────────────────────────

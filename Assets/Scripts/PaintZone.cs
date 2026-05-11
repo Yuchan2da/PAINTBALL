@@ -7,9 +7,12 @@ using Photon.Pun;
 ///
 /// [동작]
 /// 1. 폭발 지점에 반투명 팀색 구체가 천천히 커지며 생성 (expandDuration 동안)
-/// 2. 존 안에 있는 적에게 초당 데미지
+/// 2. 존 안에 있는 적에게 점진적 증가 데미지 (10→45 DPS)
 /// 3. duration 후 자동 소멸 (서서히 줄어들며 사라짐)
 /// 4. 바닥에 팀색 페인트 데칼 산포
+///
+/// [비주얼]
+/// - 양면 렌더링(Cull Off)으로 존 안에서도 구체가 보임
 ///
 /// [네트워크]
 /// - 시각 효과는 모든 클라이언트에서 동일하게 생성 (RPC_Explode에서 호출)
@@ -23,8 +26,12 @@ public class PaintZone : MonoBehaviour
     float duration = 4f;
     float expandDuration = 0.5f;        // 원이 커지는 시간
     float shrinkDuration = 0.5f;        // 소멸 시 줄어드는 시간
-    float damagePerSecond = 10f;
-    float damageInterval = 0.5f;        // 데미지 적용 간격 (프레임마다 X)
+    float damageInterval = 0.5f;        // 데미지 적용 간격
+
+    // DPS 점진적 증가 (시작 → 최대)
+    float minDPS = 10f;
+    float maxDPS = 45f;
+    float dpsRampDuration = 2f;         // 몇 초에 걸쳐 최대 DPS에 도달하는지
 
     // ─── 상태 ─────────────────────────────────────────────────────
     Color paintColor;
@@ -60,15 +67,17 @@ public class PaintZone : MonoBehaviour
 
     void Init()
     {
-        // GameSettings에서 수류탄 DPS 적용
-        damagePerSecond = GameSettings.Current.grenadeDPS;
+        // GameSettings에서 수류탄 DPS 기본값 적용 (최소 DPS)
+        minDPS = GameSettings.Current.grenadeDPS;
+        // 최대 DPS는 최소의 4.5배 (10→45 비율 유지)
+        maxDPS = minDPS * 4.5f;
 
         // SphereCollider (Trigger) — 데미지 판정용
         zoneCollider = gameObject.AddComponent<SphereCollider>();
         zoneCollider.isTrigger = true;
         zoneCollider.radius = 0.01f; // 시작은 아주 작게
 
-        // 비주얼: 반투명 구체
+        // 비주얼: 반투명 양면 렌더링 구체
         CreateSphereVisual();
 
         // 바닥 데칼 생성
@@ -82,7 +91,7 @@ public class PaintZone : MonoBehaviour
 
     /// <summary>
     /// 반투명 팀색 구체를 생성한다.
-    /// 내장 Sphere 메쉬 + 투명 셰이더로 구현.
+    /// Cull Off (양면 렌더링)로 존 안에서도 볼 수 있다.
     /// </summary>
     void CreateSphereVisual()
     {
@@ -95,11 +104,11 @@ public class PaintZone : MonoBehaviour
         var col = sphereVisual.GetComponent<Collider>();
         if (col != null) Destroy(col);
 
-        // 반투명 머티리얼
+        // 반투명 양면 렌더링 머티리얼
         var renderer = sphereVisual.GetComponent<Renderer>();
         zoneMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
         Color c = paintColor;
-        c.a = 0.25f; // 반투명
+        c.a = 0.2f; // 반투명
         zoneMaterial.color = c;
 
         // 투명 모드 설정 (URP Lit)
@@ -111,6 +120,10 @@ public class PaintZone : MonoBehaviour
         zoneMaterial.SetFloat("_ZWrite", 0f);
         zoneMaterial.renderQueue = 3000;
         zoneMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+
+        // ★ 핵심: 양면 렌더링 (Cull Off) → 존 안에서도 구체가 보임
+        zoneMaterial.SetFloat("_Cull", 0f); // 0 = Off, 1 = Front, 2 = Back
+        zoneMaterial.SetInt("_CullMode", 0);
 
         renderer.material = zoneMaterial;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -147,7 +160,7 @@ public class PaintZone : MonoBehaviour
             if (zoneMaterial != null)
             {
                 Color c = paintColor;
-                c.a = Mathf.Lerp(0.25f, 0f, t);
+                c.a = Mathf.Lerp(0.2f, 0f, t);
                 zoneMaterial.color = c;
             }
         }
@@ -166,6 +179,20 @@ public class PaintZone : MonoBehaviour
 
     // ─── 데미지 판정 ─────────────────────────────────────────────
 
+    /// <summary>
+    /// 현재 시점의 DPS를 계산한다.
+    /// 시간이 지남에 따라 minDPS → maxDPS로 점진적 증가.
+    /// </summary>
+    float GetCurrentDPS()
+    {
+        // 확장 완료 후부터 DPS 증가 시작
+        float damageElapsed = Mathf.Max(0f, elapsed - expandDuration);
+        float rampT = Mathf.Clamp01(damageElapsed / dpsRampDuration);
+        // 가속 커브 (처음엔 느리게, 나중엔 빠르게)
+        rampT = rampT * rampT;
+        return Mathf.Lerp(minDPS, maxDPS, rampT);
+    }
+
     void OnTriggerStay(Collider other)
     {
         // MasterClient만 데미지 판정 (네트워크 권한)
@@ -183,8 +210,11 @@ public class PaintZone : MonoBehaviour
         // 이미 죽은 대상 무시
         if (health.IsDead) return;
 
-        // 데미지 적용
-        int damage = Mathf.RoundToInt(damagePerSecond * damageInterval);
+        // 점진적 증가 데미지 적용
+        float currentDPS = GetCurrentDPS();
+        int damage = Mathf.RoundToInt(currentDPS * damageInterval);
+        damage = Mathf.Max(1, damage); // 최소 1 데미지 보장
+
         float[] colorArr = { paintColor.r, paintColor.g, paintColor.b, paintColor.a };
         health.TakeDamageNetwork(damage, "PaintZone", false, colorArr);
 
