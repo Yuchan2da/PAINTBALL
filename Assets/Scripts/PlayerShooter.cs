@@ -42,8 +42,17 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
     [Tooltip("재장전 소요 시간 (초)")]
     public float reloadTime = 2.5f;
 
+    [Header("수류탄")]
+    [Tooltip("시작 시 보유 수류탄 개수")]
+    public int maxGrenades = 1;
+    [Tooltip("투척 힘")]
+    public float throwForce = 15f;
+    [Tooltip("위쪽 보정 힘")]
+    public float throwUpForce = 3f;
+
     public int CurrentAmmo { get; private set; }
     public int MaxAmmo => maxAmmo;
+    public int CurrentGrenades { get; private set; }
 
     private float lastFireTime;
     private Collider[] ownerHitboxes;
@@ -89,6 +98,7 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
             isLocalPlayer = photonView.IsMine;
 
         CurrentAmmo = maxAmmo;
+        CurrentGrenades = maxGrenades;
         CacheHitboxColliders();
         EnsurePlayerColors();
 
@@ -198,6 +208,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
 
         if (Input.GetKeyDown(KeyCode.R) && CurrentAmmo < maxAmmo && !isReloading)
             StartCoroutine(ReloadRoutine());
+
+        // 수류탄 투척 (G키)
+        if (Input.GetKeyDown(KeyCode.G) && CurrentGrenades > 0 && !isReloading)
+            ThrowGrenade();
     }
 
     void Fire()
@@ -279,6 +293,50 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         // 건 모델 재장전 연출 종료
         if (fpsGunModel != null)
             fpsGunModel.SetReloading(false);
+    }
+
+    // ── 수류탄 투척 ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 수류탄을 투척한다. 카메라 전방 + 약간 위 방향으로 힘을 가한다.
+    /// PhotonNetwork.Instantiate로 모든 클라이언트에서 보이며,
+    /// InstantiationData로 팀 색상 + 투척자 ViewID를 전달한다.
+    /// </summary>
+    void ThrowGrenade()
+    {
+        CurrentGrenades--;
+
+        Camera cam = playerCamera != null ? playerCamera : Camera.main;
+        Vector3 throwDir = cam.transform.forward;
+        Vector3 spawnPos = cam.transform.position + throwDir * 1.5f;
+
+        // InstantiationData: [r, g, b, a, ownerViewID]
+        object[] data = {
+            teamColor.r, teamColor.g, teamColor.b, teamColor.a,
+            photonView.ViewID
+        };
+
+        GameObject grenade = PhotonNetwork.Instantiate(
+            "PaintGrenade", spawnPos, Quaternion.identity, 0, data);
+
+        var rb = grenade.GetComponent<Rigidbody>();
+        if (rb != null)
+            rb.AddForce(throwDir * throwForce + Vector3.up * throwUpForce,
+                        ForceMode.Impulse);
+
+        // HUD 업데이트
+        if (GameHUD.Instance != null)
+            GameHUD.Instance.UpdateGrenadeCount(CurrentGrenades);
+    }
+
+    /// <summary>
+    /// 수류탄 보유량을 설정값으로 보충한다. 부활 시 호출.
+    /// </summary>
+    public void RefillGrenades()
+    {
+        CurrentGrenades = maxGrenades;
+        if (GameHUD.Instance != null)
+            GameHUD.Instance.UpdateGrenadeCount(CurrentGrenades);
     }
 
     // ── 네트워크 페인트 동기화 RPC ────────────────────────────────────

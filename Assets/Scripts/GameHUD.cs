@@ -83,6 +83,12 @@ public class GameHUD : MonoBehaviour
     [Tooltip("인게임 크로스헤어 렌더러")]
     public CrosshairRenderer crosshairRenderer;
 
+    [Header("수류탄 HUD")]
+    [Tooltip("수류탄 잔여 개수 텍스트")]
+    public TMP_Text grenadeCountText;
+    [Tooltip("수류탄 아이콘 오브젝트")]
+    public GameObject grenadeIcon;
+
     // isDirty 패턴: 이전 값과 현재 값이 다를 때만 UI 텍스트를 갱신
     private int lastAmmo   = -1;
     private int lastHp     = -1;
@@ -101,6 +107,19 @@ public class GameHUD : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
+
+    // ── 수류탄 HUD ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 수류탄 잔여 개수 UI를 갱신한다.
+    /// </summary>
+    public void UpdateGrenadeCount(int count)
+    {
+        if (grenadeCountText != null)
+            grenadeCountText.text = count.ToString();
+        if (grenadeIcon != null)
+            grenadeIcon.SetActive(count > 0);
     }
 
     void Start()

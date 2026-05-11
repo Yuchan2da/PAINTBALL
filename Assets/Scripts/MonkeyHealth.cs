@@ -409,7 +409,11 @@ public class MonkeyHealth : MonoBehaviourPun
         if (playerShooter != null && playerShooter.fpsGunModel != null)
             playerShooter.fpsGunModel.SetVisible(true);
 
-        // 8) 네트워크: 원격 클라이언트에도 리스폰 연출 전송
+        // 8) 수류탄 보충
+        if (playerShooter != null)
+            playerShooter.RefillGrenades();
+
+        // 9) 네트워크: 원격 클라이언트에도 리스폰 연출 전송
         if (PhotonNetwork.IsConnected && photonView != null && photonView.IsMine)
             photonView.RPC(nameof(RPC_RemoteRespawn), RpcTarget.Others);
     }
