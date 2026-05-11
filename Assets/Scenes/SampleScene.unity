@@ -460,7 +460,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &69278366
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1515,14 +1515,14 @@ RectTransform:
   - {fileID: 960633574}
   - {fileID: 2078966450}
   - {fileID: 482176502}
-  - {fileID: 69278366}
   - {fileID: 2111613708}
   - {fileID: 494419826}
-  - {fileID: 552854624}
   - {fileID: 1201352590}
   - {fileID: 907740700}
   - {fileID: 600571581}
   - {fileID: 206755971}
+  - {fileID: 69278366}
+  - {fileID: 552854624}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1562,6 +1562,8 @@ MonoBehaviour:
   timerText: {fileID: 494419824}
   stateText: {fileID: 552854622}
   crosshairRenderer: {fileID: 1201352589}
+  grenadeCountText: {fileID: 0}
+  grenadeIcon: {fileID: 0}
 --- !u!114 &240263661
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4272,7 +4274,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &552854622
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4293,7 +4295,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 
+  m_text: "\uAC8C\uC784\uC774\uB05D\uB0AC\uC2B5\uB2C8\uB2E4\n\n #1: TestPlayer"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 37bcfd959139bb945882bf6fc90fb939, type: 2}
   m_sharedMaterial: {fileID: 1834120404091383906, guid: 37bcfd959139bb945882bf6fc90fb939, type: 2}
@@ -4389,7 +4391,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 80}
+  m_AnchoredPosition: {x: 0, y: 262}
   m_SizeDelta: {x: 600, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &557706454

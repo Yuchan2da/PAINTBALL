@@ -634,60 +634,148 @@ public class GameHUD : MonoBehaviour
     /// <summary>
     /// GameOver 결과 UI를 실제로 표시하는 핵심 메서드.
     /// OnGameOver 이벤트 또는 Update() 안전장치에서 호출.
+    ///
+    /// ★ 기존 Canvas 자식(StateText)을 활성화하는 방식은
+    ///   HitVignetteOverlay 등 런타임 생성 UI에 가려질 수 있으므로,
+    ///   sortingOrder가 매우 높은 별도 Canvas를 생성하여
+    ///   어떤 것으로도 가려지지 않는 독립 오버레이로 표시한다.
     /// </summary>
     void ShowGameOverUI(string winnerName)
     {
-        // ★ HitScreenEffect 오버레이 제거 —
-        //   런타임에 생성된 전체화면 Image가 Canvas 최상위에 있으므로
-        //   이것이 StateText/ScoreboardPanel 위에 렌더링되어 UI를 가린다.
+        Debug.Log($"[GameHUD] ShowGameOverUI 실행 — winnerName={winnerName}");
+
+        // ── 피격 이펙트 제거 ──
         if (HitScreenEffect.Instance != null)
             HitScreenEffect.Instance.Clear();
 
+        // ── 기존 stateText도 활성화 (폴백용) ──
         ShowStateText("GAME OVER!\n#1: " + winnerName);
 
-        // 승리 텍스트를 화면 상단으로 이동 (스코어보드와 겹침 방지)
-        if (stateText != null)
-        {
-            var rt = stateText.GetComponent<RectTransform>();
-            if (rt != null)
-            {
-                rt.anchorMin = new Vector2(0.5f, 0.85f);
-                rt.anchorMax = new Vector2(0.5f, 0.85f);
-                rt.anchoredPosition = Vector2.zero;
-            }
-
-            // 텍스트 크기 강조
-            stateText.fontSize = 48f;
-            stateText.fontStyle = FontStyles.Bold;
-
-            // ★ StateText를 Canvas 맨 앞으로 이동 (HitVignetteOverlay 위)
-            stateText.transform.SetAsLastSibling();
-        }
-
-        // 점수판 자동 표시
+        // ── 점수판 표시 ──
         if (scoreboardPanel != null)
         {
             scoreboardPanel.SetActive(true);
             RefreshScoreboard();
-
-            // 스코어보드를 화면 중앙~하단으로 이동
-            var sbRt = scoreboardPanel.GetComponent<RectTransform>();
-            if (sbRt != null)
-            {
-                sbRt.anchorMin = new Vector2(0.5f, 0.35f);
-                sbRt.anchorMax = new Vector2(0.5f, 0.35f);
-                sbRt.anchoredPosition = Vector2.zero;
-            }
-
-            // ★ ScoreboardPanel도 Canvas 맨 앞으로 (StateText 바로 아래)
-            scoreboardPanel.transform.SetAsLastSibling();
-            // StateText를 다시 최상위로 (ScoreboardPanel보다 위)
-            if (stateText != null) stateText.transform.SetAsLastSibling();
         }
-        else
+
+        // ── 독립 GameOver 오버레이 Canvas 생성 ──
+        CreateGameOverOverlay(winnerName);
+    }
+
+    /// <summary>
+    /// sortingOrder 9999의 독립 Canvas에 GameOver 결과를 표시한다.
+    /// 이 Canvas는 씬 전환 시 자동 파괴된다.
+    /// </summary>
+    private GameObject gameOverOverlay;
+
+    void CreateGameOverOverlay(string winnerName)
+    {
+        // 이미 생성됐으면 중복 생성 방지
+        if (gameOverOverlay != null) return;
+
+        // ── Canvas 생성 ──
+        gameOverOverlay = new GameObject("GameOverOverlay");
+        var canvas = gameOverOverlay.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 9999; // 모든 것 위에 렌더링
+
+        var scaler = gameOverOverlay.AddComponent<UnityEngine.UI.CanvasScaler>();
+        scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        gameOverOverlay.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+        // ── 반투명 배경 ──
+        var bg = new GameObject("Background");
+        bg.transform.SetParent(gameOverOverlay.transform, false);
+        var bgRt = bg.AddComponent<RectTransform>();
+        bgRt.anchorMin = Vector2.zero;
+        bgRt.anchorMax = Vector2.one;
+        bgRt.offsetMin = Vector2.zero;
+        bgRt.offsetMax = Vector2.zero;
+        var bgImg = bg.AddComponent<UnityEngine.UI.Image>();
+        bgImg.color = new Color(0f, 0f, 0f, 0.7f); // 반투명 검정
+        bgImg.raycastTarget = false;
+
+        // ── "GAME OVER!" 타이틀 ──
+        var titleGo = new GameObject("TitleText");
+        titleGo.transform.SetParent(gameOverOverlay.transform, false);
+        var titleRt = titleGo.AddComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0.5f, 0.75f);
+        titleRt.anchorMax = new Vector2(0.5f, 0.75f);
+        titleRt.sizeDelta = new Vector2(800, 120);
+        titleRt.anchoredPosition = Vector2.zero;
+
+        var titleTmp = titleGo.AddComponent<TMPro.TextMeshProUGUI>();
+        titleTmp.text = "GAME OVER!";
+        titleTmp.fontSize = 72;
+        titleTmp.fontStyle = FontStyles.Bold;
+        titleTmp.color = Color.white;
+        titleTmp.alignment = TMPro.TextAlignmentOptions.Center;
+        titleTmp.enableWordWrapping = false;
+
+        // ── 승자 텍스트 ──
+        var winnerGo = new GameObject("WinnerText");
+        winnerGo.transform.SetParent(gameOverOverlay.transform, false);
+        var winnerRt = winnerGo.AddComponent<RectTransform>();
+        winnerRt.anchorMin = new Vector2(0.5f, 0.62f);
+        winnerRt.anchorMax = new Vector2(0.5f, 0.62f);
+        winnerRt.sizeDelta = new Vector2(800, 80);
+        winnerRt.anchoredPosition = Vector2.zero;
+
+        var winnerTmp = winnerGo.AddComponent<TMPro.TextMeshProUGUI>();
+        winnerTmp.text = "#1: " + winnerName;
+        winnerTmp.fontSize = 48;
+        winnerTmp.color = new Color(1f, 0.84f, 0f); // 금색
+        winnerTmp.alignment = TMPro.TextAlignmentOptions.Center;
+        winnerTmp.enableWordWrapping = false;
+
+        // ── 점수판 복제 (ScoreManager에서 직접 조회) ──
+        if (ScoreManager.Instance != null)
         {
-            Debug.LogWarning("[GameHUD] scoreboardPanel이 null! Inspector에서 연결을 확인하세요.");
+            var ranking = ScoreManager.Instance.GetRanking();
+            string localName = Photon.Pun.PhotonNetwork.IsConnected
+                ? Photon.Pun.PhotonNetwork.NickName : "Player";
+
+            float startY = 0.50f;
+            float step = 0.055f;
+
+            // 헤더
+            CreateOverlayLine(gameOverOverlay.transform, startY,
+                "<color=#AAAAAA>  #   Player          K    D    Score</color>", 24, Color.white);
+
+            for (int i = 0; i < ranking.Count && i < 8; i++)
+            {
+                var s = ranking[i];
+                float y = startY - step * (i + 1);
+                bool isMe = s.playerName == localName;
+
+                string line = $"  {i + 1}.  {s.playerName,-16} {s.kills,-5}{s.deaths,-5}{s.kills}";
+                Color lineColor = isMe ? new Color(1f, 0.84f, 0f) : Color.white;
+                CreateOverlayLine(gameOverOverlay.transform, y, line, 22, lineColor);
+            }
         }
+
+        Debug.Log("[GameHUD] GameOver 독립 오버레이 Canvas 생성 완료");
+    }
+
+    void CreateOverlayLine(Transform parent, float yAnchor, string text, float fontSize, Color color)
+    {
+        var go = new GameObject("Line");
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, yAnchor);
+        rt.anchorMax = new Vector2(0.5f, yAnchor);
+        rt.sizeDelta = new Vector2(700, 35);
+        rt.anchoredPosition = Vector2.zero;
+
+        var tmp = go.AddComponent<TMPro.TextMeshProUGUI>();
+        tmp.text = text;
+        tmp.fontSize = fontSize;
+        tmp.color = color;
+        tmp.alignment = TMPro.TextAlignmentOptions.Left;
+        tmp.enableWordWrapping = false;
     }
 
     /// <summary>
