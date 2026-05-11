@@ -37,6 +37,7 @@ public class PaintZone : MonoBehaviour
     // ─── 상태 ─────────────────────────────────────────────────────
     Color paintColor;
     int ownerViewID;
+    string ownerName;       // 투척자 닉네임 (킬 귀속용)
     float elapsed;
     float currentRadius;
     float lastDamageTime;
@@ -71,6 +72,9 @@ public class PaintZone : MonoBehaviour
         minDPS = GameSettings.Current.grenadeDPS;
         // 최대 DPS는 최소의 4.5배 (10→45 비율 유지)
         maxDPS = minDPS * 4.5f;
+
+        // ★ ownerViewID로 투척자 닉네임을 캐싱 (킬 귀속)
+        ownerName = ResolveOwnerName();
 
         // ★ Kinematic Rigidbody 추가 — OnTriggerStay 감지 보장
         // Unity 물리 규칙: Trigger 충돌에는 최소 한쪽에 Rigidbody가 필요하다.
@@ -242,7 +246,7 @@ public class PaintZone : MonoBehaviour
 
         // 직접 로컬 TakeDamage 호출 (자기 자신이므로 RPC 불필요)
         Color dmgColor = paintColor;
-        localHealth.TakeDamage(damage, "PaintZone", false, dmgColor);
+        localHealth.TakeDamage(damage, ownerName, false, dmgColor);
 
         lastDamageTime = Time.time;
     }
@@ -275,6 +279,23 @@ public class PaintZone : MonoBehaviour
 
         localHealthSearched = true;
         return cachedLocalHealth;
+    }
+    // ─── 투척자 이름 해석 ──────────────────────────────────────────
+
+    /// <summary>
+    /// ownerViewID(투척자의 PhotonView ID)로 플레이어 닉네임을 반환한다.
+    /// 킬 피드와 스코어보드에 "PaintZone" 대신 실제 투척자 이름을 표시하기 위해 사용.
+    /// </summary>
+    string ResolveOwnerName()
+    {
+        if (ownerViewID == 0) return "Unknown";
+
+        var ownerView = PhotonView.Find(ownerViewID);
+        if (ownerView != null && ownerView.Owner != null)
+            return ownerView.Owner.NickName;
+
+        // PhotonView를 찾지 못한 경우 (이미 파괴됨 등)
+        return "Unknown";
     }
 
     // ─── 바닥 데칼 ───────────────────────────────────────────────
