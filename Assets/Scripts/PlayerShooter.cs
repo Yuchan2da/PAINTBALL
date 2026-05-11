@@ -331,6 +331,10 @@ public class PlayerShooter : MonoBehaviourPunCallbacks
         // HUD 업데이트
         if (GameHUD.Instance != null)
             GameHUD.Instance.UpdateGrenadeCount(CurrentGrenades);
+
+        // 투척 효과음
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.PlayGrenadeThrow(spawnPos);
     }
 
     /// <summary>

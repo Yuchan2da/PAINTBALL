@@ -25,6 +25,10 @@ public class SFXManager : MonoBehaviour
     [Tooltip("헤드샷 피격음")] public AudioClip headshotClip;
     [Tooltip("재장전음")] public AudioClip reloadClip;
 
+    [Header("수류탄 클립")]
+    [Tooltip("수류탄 투척음")] public AudioClip grenadeThrowClip;
+    [Tooltip("페인트존 생성/폭발음")] public AudioClip grenadeExplodeClip;
+
     [Header("킬 알림 클립")]
     [Tooltip("일반 킬 알림음")] public AudioClip killClip;
     [Tooltip("헤드샷 킬 알림음")] public AudioClip headshotKillClip;
@@ -140,6 +144,18 @@ public class SFXManager : MonoBehaviour
     public void PlayReload(Vector3 position)
     {
         Play3D(reloadClip, position);
+    }
+
+    /// <summary>수류탄 투척음 재생 (3D)</summary>
+    public void PlayGrenadeThrow(Vector3 position)
+    {
+        Play3D(grenadeThrowClip, position);
+    }
+
+    /// <summary>페인트존 폭발/생성음 재생 (3D)</summary>
+    public void PlayGrenadeExplode(Vector3 position)
+    {
+        Play3D(grenadeExplodeClip, position);
     }
 
     // ── 공개 메서드: 킬 알림 ─────────────────────────────────────

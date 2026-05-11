@@ -94,6 +94,10 @@ public class PaintZone : MonoBehaviour
         // 바닥 데칼 생성
         SpawnFloorDecals();
 
+        // 폭발/존 생성 효과음
+        if (SFXManager.Instance != null)
+            SFXManager.Instance.PlayGrenadeExplode(transform.position);
+
         // 자동 소멸
         Destroy(gameObject, duration);
     }
