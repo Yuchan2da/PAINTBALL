@@ -64,10 +64,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     /// <summary>
     /// 연결이 끊기면 로비로 복귀.
-    /// OfflineMode 초기화로 다음 연결을 보장.
+    /// 단, GameOver에서 LeaveRoom()에 의한 정상 종료 시에는
+    /// GameManager.OnLeftRoom()이 씬 전환을 담당하므로 여기서는 무시한다.
     /// </summary>
     public override void OnDisconnected(Photon.Realtime.DisconnectCause cause)
     {
+        // GameOver 정상 흐름이면 GameManager.OnLeftRoom()에서 처리
+        if (GameManager.Instance != null
+            && GameManager.Instance.CurrentState == GameManager.GameState.GameOver)
+        {
+            Debug.Log($"[NetworkManager] GameOver 정상 종료 중 Disconnect({cause}) — 무시");
+            return;
+        }
+
         Debug.LogWarning($"[NetworkManager] 연결 끊김: {cause}. 로비로 이동.");
         PhotonNetwork.OfflineMode = false;
         UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");

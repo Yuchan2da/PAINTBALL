@@ -282,6 +282,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     public override void OnLeftRoom()
     {
         Debug.Log("[GameManager] 방 퇴장 완료 → 로비로 이동");
+        PhotonNetwork.OfflineMode = false; // 다음 연결을 위해 초기화
         UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
     }
 
@@ -290,6 +291,11 @@ public class GameManager : MonoBehaviourPunCallbacks
     void EndRound()
     {
         SetState(GameState.GameOver);
+
+        // ★ 라운드 종료 시 AutomaticallySyncScene을 즉시 끈다.
+        //   → MasterClient가 먼저 방을 떠나더라도 다른 클라이언트의
+        //     씬이 자동 전환되지 않고, 결과 화면을 볼 수 있다.
+        PhotonNetwork.AutomaticallySyncScene = false;
 
         // 조작 잠금
         SetAllPlayersInput(false);
