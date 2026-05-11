@@ -73,6 +73,7 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     // ── 내부 ────────────────────────────────────────────────────────
     private float gameOverTimer;
+    private bool isReturningToLobby;
 
     /// <summary>
     /// Photon 서버 시간 기준 플레이 시작 시각.
@@ -250,21 +251,38 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         gameOverTimer -= Time.deltaTime;
 
-        if (gameOverTimer <= 0f)
+        if (gameOverTimer <= 0f && !isReturningToLobby)
         {
+            isReturningToLobby = true; // 중복 호출 방지
+
             // 멀티플레이: 로비로 복귀
             if (PhotonNetwork.IsConnected && !PhotonNetwork.OfflineMode)
             {
                 if (SFXManager.Instance != null) SFXManager.Instance.StopBGM();
+
+                // AutomaticallySyncScene을 끄고 각 클라이언트가 독립적으로 방을 떠남
+                PhotonNetwork.AutomaticallySyncScene = false;
                 PhotonNetwork.LeaveRoom();
-                UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
+                // OnLeftRoom() 콜백에서 씬 전환 처리
             }
             else
             {
                 // 연습 모드: 자동으로 새 라운드 시작
+                isReturningToLobby = false;
                 StartGame();
             }
         }
+    }
+
+    /// <summary>
+    /// Photon 방을 정상적으로 떠난 후 호출.
+    /// LeaveRoom()과 LoadScene()을 같은 프레임에 호출하면
+    /// Photon 상태가 꼬이므로, 이 콜백에서 안전하게 씬 전환.
+    /// </summary>
+    public override void OnLeftRoom()
+    {
+        Debug.Log("[GameManager] 방 퇴장 완료 → 로비로 이동");
+        UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
     }
 
     // ── 라운드 종료 ──────────────────────────────────────────────────

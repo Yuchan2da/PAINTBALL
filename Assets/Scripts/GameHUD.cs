@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -122,6 +123,9 @@ public class GameHUD : MonoBehaviour
             grenadeIcon.SetActive(count > 0);
     }
 
+    // ─── GameOver 표시 상태 추적 ────────────────────────────────
+    private bool gameOverShown;
+
     void Start()
     {
         // HP 슬라이더 초기 범위 설정 (레거시)
@@ -143,9 +147,34 @@ public class GameHUD : MonoBehaviour
         if (stateText != null)
             stateText.gameObject.SetActive(false);
 
-        // ── 이벤트 구독 ──────────────────────────────────────────
+        // ── 이벤트 구독 (코루틴으로 안전하게) ─────────────────────
+        StartCoroutine(SubscribeToManagers());
+    }
+
+    /// <summary>
+    /// GameManager와 ScoreManager가 준비될 때까지 기다려서 이벤트를 구독한다.
+    /// Start() 실행 순서에 따라 아직 Instance가 null일 수 있으므로
+    /// 최대 1초까지 매 프레임 재시도한다.
+    /// </summary>
+    IEnumerator SubscribeToManagers()
+    {
+        // ScoreManager 구독
+        float waited = 0f;
+        while (ScoreManager.Instance == null && waited < 1f)
+        {
+            yield return null;
+            waited += Time.deltaTime;
+        }
         if (ScoreManager.Instance != null)
             ScoreManager.Instance.OnKillEvent += OnKillEvent;
+
+        // GameManager 구독 (가장 중요!)
+        waited = 0f;
+        while (GameManager.Instance == null && waited < 1f)
+        {
+            yield return null;
+            waited += Time.deltaTime;
+        }
 
         if (GameManager.Instance != null)
         {
@@ -155,10 +184,11 @@ public class GameHUD : MonoBehaviour
             // ★ 핵심: GameManager.Start()가 먼저 실행됐을 수 있으므로
             //   현재 상태를 직접 동기화 (이벤트를 놓쳐도 안전)
             SyncToCurrentState(GameManager.Instance.CurrentState);
+            Debug.Log("[GameHUD] GameManager 이벤트 구독 성공. 현재 상태: " + GameManager.Instance.CurrentState);
         }
         else
         {
-            // GameManager가 없으면 기본 HUD만 표시
+            Debug.LogWarning("[GameHUD] GameManager.Instance를 찾지 못함! 기본 HUD만 표시.");
             SetHudVisible(true);
         }
     }
@@ -212,6 +242,18 @@ public class GameHUD : MonoBehaviour
         RefreshTimer();
         HandleScoreboardToggle();
         RefreshCrosshairMovement();
+
+        // ── GameOver 안전장치 ─────────────────────────────────────
+        // 이벤트를 놓쳤거나 구독이 늦어서 GameOver 결과가 안 보이는 경우 보정
+        if (!gameOverShown
+            && GameManager.Instance != null
+            && GameManager.Instance.CurrentState == GameManager.GameState.GameOver)
+        {
+            Debug.Log("[GameHUD] GameOver 안전장치 발동 — 결과 화면 강제 표시");
+            SyncToCurrentState(GameManager.GameState.GameOver);
+            ForceShowGameOverResult();
+            gameOverShown = true;
+        }
     }
 
     // ── 총알 아이콘 캐싱 ───────────────────────────────────────────
@@ -553,6 +595,7 @@ public class GameHUD : MonoBehaviour
                 // 이전 라운드 UI 정리
                 if (scoreboardPanel != null) scoreboardPanel.SetActive(false);
                 ClearKillFeed();
+                gameOverShown = false; // 다음 라운드용 리셋
 
                 // GameOver에서 옮긴 RectTransform 위치 원복
                 ResetUiPositions();
@@ -577,6 +620,18 @@ public class GameHUD : MonoBehaviour
 
     void OnGameOver(string winnerName)
     {
+        Debug.Log($"[GameHUD] OnGameOver 호출됨. 승자: {winnerName}");
+        gameOverShown = true;
+
+        ShowGameOverUI(winnerName);
+    }
+
+    /// <summary>
+    /// GameOver 결과 UI를 실제로 표시하는 핵심 메서드.
+    /// OnGameOver 이벤트 또는 Update() 안전장치에서 호출.
+    /// </summary>
+    void ShowGameOverUI(string winnerName)
+    {
         ShowStateText("GAME OVER!\n#1: " + winnerName);
 
         // 승리 텍스트를 화면 상단으로 이동 (스코어보드와 겹침 방지)
@@ -589,6 +644,10 @@ public class GameHUD : MonoBehaviour
                 rt.anchorMax = new Vector2(0.5f, 0.85f);
                 rt.anchoredPosition = Vector2.zero;
             }
+
+            // 텍스트 크기 강조
+            stateText.fontSize = 48f;
+            stateText.fontStyle = FontStyles.Bold;
         }
 
         // 점수판 자동 표시
@@ -606,6 +665,25 @@ public class GameHUD : MonoBehaviour
                 sbRt.anchoredPosition = Vector2.zero;
             }
         }
+        else
+        {
+            Debug.LogWarning("[GameHUD] scoreboardPanel이 null! Inspector에서 연결을 확인하세요.");
+        }
+    }
+
+    /// <summary>
+    /// Update() 안전장치에서 호출. 이벤트를 놓쳤을 때 ScoreManager에서 직접 1등을 조회.
+    /// </summary>
+    void ForceShowGameOverResult()
+    {
+        string winnerName = "Unknown";
+        if (ScoreManager.Instance != null)
+        {
+            var ranking = ScoreManager.Instance.GetRanking();
+            if (ranking.Count > 0)
+                winnerName = ranking[0].playerName;
+        }
+        ShowGameOverUI(winnerName);
     }
 
     // ── 상태 텍스트 유틸리티 ─────────────────────────────────────
