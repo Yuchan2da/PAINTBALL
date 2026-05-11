@@ -16,14 +16,15 @@ using Photon.Pun;
 ///
 /// [네트워크]
 /// - 시각 효과는 모든 클라이언트에서 동일하게 생성 (RPC_Explode에서 호출)
-/// - 데미지 판정은 MasterClient만 수행 → TakeDamageNetwork() RPC로 전달
+/// - 데미지 판정은 각 클라이언트가 자신의 로컬 플레이어에 대해서만 수행 (Owner-authoritative)
+///   → 호스트/비호스트 관계없이 모든 플레이어에게 안정적으로 데미지 적용
 /// - 자폭 없음 (ownerViewID 제외)
 /// </summary>
 public class PaintZone : MonoBehaviour
 {
     // ─── 설정 ─────────────────────────────────────────────────────
-    float maxRadius = 4f;
-    float duration = 4f;
+    float maxRadius = 5f;
+    float duration = 5.5f;
     float expandDuration = 0.5f;        // 원이 커지는 시간
     float shrinkDuration = 0.5f;        // 소멸 시 줄어드는 시간
     float damageInterval = 0.5f;        // 데미지 적용 간격
@@ -43,7 +44,6 @@ public class PaintZone : MonoBehaviour
     // ─── 비주얼 ───────────────────────────────────────────────────
     GameObject sphereVisual;
     Material zoneMaterial;
-    SphereCollider zoneCollider;
 
     // ─── 정적 팩토리 ─────────────────────────────────────────────
 
@@ -72,10 +72,17 @@ public class PaintZone : MonoBehaviour
         // 최대 DPS는 최소의 4.5배 (10→45 비율 유지)
         maxDPS = minDPS * 4.5f;
 
+        // ★ Kinematic Rigidbody 추가 — OnTriggerStay 감지 보장
+        // Unity 물리 규칙: Trigger 충돌에는 최소 한쪽에 Rigidbody가 필요하다.
+        // PaintZone에 Kinematic Rigidbody를 넣어 모든 Collider와 트리거 이벤트 발생.
+        var rb = gameObject.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
         // SphereCollider (Trigger) — 데미지 판정용
-        zoneCollider = gameObject.AddComponent<SphereCollider>();
+        var zoneCollider = gameObject.AddComponent<SphereCollider>();
         zoneCollider.isTrigger = true;
-        zoneCollider.radius = 0.01f; // 시작은 아주 작게
+        zoneCollider.radius = maxRadius; // 최종 크기로 바로 설정
 
         // 비주얼: 반투명 양면 렌더링 구체
         CreateSphereVisual();
@@ -172,9 +179,11 @@ public class PaintZone : MonoBehaviour
             sphereVisual.transform.localScale = new Vector3(diameter, diameter, diameter);
         }
 
-        // 콜라이더 크기 업데이트
-        if (zoneCollider != null)
-            zoneCollider.radius = currentRadius;
+        // ─── 거리 기반 데미지 판정 (프레임마다) ────────────────────
+        // OnTriggerStay 대신 거리 기반 판정을 사용.
+        // 이유: 모든 클라이언트에서 자신의 로컬 플레이어에 대해 판정하므로
+        //       트리거 충돌 레이어/Rigidbody 설정에 의존하지 않아 더 안정적.
+        UpdateDamage();
     }
 
     // ─── 데미지 판정 ─────────────────────────────────────────────
@@ -193,32 +202,79 @@ public class PaintZone : MonoBehaviour
         return Mathf.Lerp(minDPS, maxDPS, rampT);
     }
 
-    void OnTriggerStay(Collider other)
+    /// <summary>
+    /// 거리 기반 데미지 판정. 각 클라이언트가 자신의 로컬 플레이어에 대해서만 실행.
+    /// OnTriggerStay 방식 대신 사용하여 네트워크 환경에서 안정적으로 동작.
+    ///
+    /// [왜 이 방식?]
+    /// - OnTriggerStay는 Rigidbody/Collider 레이어 설정에 따라 원격 플레이어를 감지 못할 수 있음
+    /// - 각 클라이언트가 자기 플레이어만 판정 → 중복 데미지 없음 + 네트워크 지연 최소
+    /// </summary>
+    void UpdateDamage()
     {
-        // MasterClient만 데미지 판정 (네트워크 권한)
-        if (PhotonNetwork.IsConnected && !PhotonNetwork.IsMasterClient) return;
+        // 확장 중에는 데미지 없음
+        if (elapsed < expandDuration) return;
 
-        // 데미지 간격 체크 (프레임마다 X, interval마다)
+        // 수축 중에는 데미지 없음
+        if (elapsed > duration - shrinkDuration) return;
+
+        // 데미지 간격 체크
         if (Time.time - lastDamageTime < damageInterval) return;
 
-        var health = other.GetComponentInParent<MonkeyHealth>();
-        if (health == null) return;
+        // 로컬 플레이어 찾기
+        MonkeyHealth localHealth = FindLocalPlayerHealth();
+        if (localHealth == null) return;
 
         // 자폭 방지: 투척자 제외
-        if (health.photonView != null && health.photonView.ViewID == ownerViewID) return;
+        if (localHealth.photonView != null && localHealth.photonView.ViewID == ownerViewID) return;
 
         // 이미 죽은 대상 무시
-        if (health.IsDead) return;
+        if (localHealth.IsDead) return;
+
+        // 거리 판정: 현재 반경 안에 있는가?
+        float dist = Vector3.Distance(transform.position, localHealth.transform.position);
+        if (dist > currentRadius) return;
 
         // 점진적 증가 데미지 적용
         float currentDPS = GetCurrentDPS();
         int damage = Mathf.RoundToInt(currentDPS * damageInterval);
         damage = Mathf.Max(1, damage); // 최소 1 데미지 보장
 
-        float[] colorArr = { paintColor.r, paintColor.g, paintColor.b, paintColor.a };
-        health.TakeDamageNetwork(damage, "PaintZone", false, colorArr);
+        // 직접 로컬 TakeDamage 호출 (자기 자신이므로 RPC 불필요)
+        Color dmgColor = paintColor;
+        localHealth.TakeDamage(damage, "PaintZone", false, dmgColor);
 
         lastDamageTime = Time.time;
+    }
+
+    /// <summary>
+    /// 로컬 플레이어(내가 소유한)의 MonkeyHealth를 찾는다.
+    /// 캐싱으로 매 프레임 검색 비용 최소화.
+    /// </summary>
+    MonkeyHealth cachedLocalHealth;
+    bool localHealthSearched;
+
+    MonkeyHealth FindLocalPlayerHealth()
+    {
+        if (localHealthSearched) return cachedLocalHealth;
+
+        // 씬의 모든 MonkeyHealth 중 내 것만 찾기
+        var allHealth = FindObjectsByType<MonkeyHealth>(FindObjectsSortMode.None);
+        foreach (var h in allHealth)
+        {
+            if (h.photonView != null && h.photonView.IsMine)
+            {
+                cachedLocalHealth = h;
+                break;
+            }
+        }
+
+        // 오프라인 모드 (연습모드)
+        if (cachedLocalHealth == null && !PhotonNetwork.IsConnected && allHealth.Length > 0)
+            cachedLocalHealth = allHealth[0];
+
+        localHealthSearched = true;
+        return cachedLocalHealth;
     }
 
     // ─── 바닥 데칼 ───────────────────────────────────────────────
