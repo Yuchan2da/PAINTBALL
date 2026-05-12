@@ -91,9 +91,10 @@ public class GameHUD : MonoBehaviour
     public GameObject grenadeIcon;
 
     // isDirty 패턴: 이전 값과 현재 값이 다를 때만 UI 텍스트를 갱신
-    private int lastAmmo   = -1;
-    private int lastHp     = -1;
-    private float lastTime = -1f;
+    private int lastAmmo     = -1;
+    private int lastHp       = -1;
+    private int lastGrenades = -1;
+    private float lastTime   = -1f;
 
     // 총알 아이콘 캐시
     private Image[] bulletIcons;
@@ -118,9 +119,15 @@ public class GameHUD : MonoBehaviour
     public void UpdateGrenadeCount(int count)
     {
         if (grenadeCountText != null)
-            grenadeCountText.text = count.ToString();
+        {
+            grenadeCountText.text  = count.ToString();
+            // 0개면 빨간색으로 강조, 보유 중이면 기본 흰색
+            grenadeCountText.color = count <= 0 ? Color.red : Color.white;
+        }
+
+        // 아이콘은 항상 표시 (0개일 때도 빨간 숫자와 함께 남겨 인지 가능하게)
         if (grenadeIcon != null)
-            grenadeIcon.SetActive(count > 0);
+            grenadeIcon.SetActive(true);
     }
 
     // ─── GameOver 표시 상태 추적 ────────────────────────────────
@@ -239,6 +246,7 @@ public class GameHUD : MonoBehaviour
     {
         RefreshAmmo();
         RefreshHp();
+        RefreshGrenades();
         RefreshTimer();
         HandleScoreboardToggle();
         RefreshCrosshairMovement();
@@ -330,6 +338,18 @@ public class GameHUD : MonoBehaviour
             ammoText.text = current + " / " + playerShooter.MaxAmmo;
             ammoText.color = current <= 5 ? Color.red : Color.white;
         }
+    }
+
+    // ── 수류탄 갱신 ────────────────────────────────────────────────
+    void RefreshGrenades()
+    {
+        if (playerShooter == null) return;
+
+        int current = playerShooter.CurrentGrenades;
+        if (current == lastGrenades) return;
+
+        lastGrenades = current;
+        UpdateGrenadeCount(current);
     }
 
     // ── 체력 갱신 (HP 바) ──────────────────────────────────────────
@@ -843,9 +863,10 @@ public class GameHUD : MonoBehaviour
     /// </summary>
     public void ForceRefresh()
     {
-        lastAmmo = -1;
-        lastHp   = -1;
-        lastTime = -1f;
+        lastAmmo     = -1;
+        lastHp       = -1;
+        lastGrenades = -1;
+        lastTime     = -1f;
 
         // 리스폰 시 크로스헤어 동적 오프셋 리셋
         if (crosshairRenderer != null)
